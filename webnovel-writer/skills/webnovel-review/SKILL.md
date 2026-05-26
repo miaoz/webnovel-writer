@@ -54,7 +54,7 @@ export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WOR
 GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
-  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {chapter_num} --persist --emit-runtime-contracts --format both
+  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --volume {volume_num} --chapter {chapter_in_volume} --persist --emit-runtime-contracts --format both
 ```
 
 要求：
@@ -98,7 +98,7 @@ cat "${PROJECT_ROOT}/.webnovel/state.json"
 ```text
 Agent(
   subagent_type: "webnovel-writer:reviewer",
-  prompt: "chapter={chapter_num}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
+  prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
 
@@ -119,7 +119,7 @@ Agent(
 
 ### Step 5：生成审查报告并落库
 
-报告保存到：`审查报告/第{chapter_num}章审查报告.md`
+报告保存到：`审查报告/第{volume_num}卷第{chapter_in_volume}章审查报告.md`
 
 报告结构：
 - 总览（问题数 / 阻断数）
@@ -131,10 +131,10 @@ Agent(
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
-  --chapter {chapter_num} \
+  --volume {volume_num} --chapter {chapter_in_volume} \
   --review-results "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
   --metrics-out "${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json" \
-  --report-file "审查报告/第{chapter_num}章审查报告.md"
+  --report-file "审查报告/第{volume_num}卷第{chapter_in_volume}章审查报告.md"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" index save-review-metrics \
   --data "@${PROJECT_ROOT}/.webnovel/tmp/review_metrics.json"
@@ -149,7 +149,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 先写入兼容审查记录（read-model/projection，不是写后事实真源）：
 
 ```bash
-python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{chapter_num}-{chapter_num}" "审查报告/第{chapter_num}章审查报告.md"
+python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{chapter_in_volume}-{chapter_in_volume}" "审查报告/第{volume_num}卷第{chapter_in_volume}章审查报告.md"
 ```
 
 如存在任意 `blocking=true` 问题，必须使用 `AskUserQuestion` 询问用户：

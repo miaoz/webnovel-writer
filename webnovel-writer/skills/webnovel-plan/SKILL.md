@@ -63,7 +63,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" pla
 GENRE="$(python -X utf8 -c "import json,sys; s=json.load(open('${PROJECT_ROOT}/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
-  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --chapter {chapter_num} --persist --emit-runtime-contracts --format both
+  story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --volume {volume_num} --chapter {chapter_in_volume} --persist --emit-runtime-contracts --format both
 ```
 
 生成后必须把 `.story-system/MASTER_SETTING.json`、`.story-system/volumes/`、
@@ -123,18 +123,23 @@ GENRE="$(python -X utf8 -c "import json; s=json.load(open('${PROJECT_ROOT}/.webn
 若已有已完成卷（`.webnovel/summaries/` 下有文件），加载以下数据感知已写内容：
 
 ```bash
-# 最近 5 章摘要（了解剧情走向）
-for ch in $(seq $((START_CH - 5)) $((START_CH - 1))); do
+# 最近 5 章摘要（使用全局编号，由 volumes_planned 自动累加换算）
+LAST_GLOBAL=$(python -X utf8 -c "
+from scripts.chapter_paths import global_from_volume_chapter
+from pathlib import Path
+print(global_from_volume_chapter(Path('${PROJECT_ROOT}'), {上一卷卷号}, {上一卷最后卷内章号}))
+")
+for ch in $(seq $((LAST_GLOBAL - 5)) $((LAST_GLOBAL - 1))); do
   cat "$PROJECT_ROOT/.webnovel/summaries/ch$(printf '%04d' $ch).md" 2>/dev/null
 done
 
-# 核心角色当前状态
+# 核心角色当前状态（使用全局编号）
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
-  knowledge query-entity-state --entity "{protagonist_id}" --at-chapter {上一卷最后章}
+  knowledge query-entity-state --entity "{protagonist_id}" --at-chapter ${LAST_GLOBAL}
 
 # 核心关系当前状态
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
-  knowledge query-relationships --entity "{protagonist_id}" --at-chapter {上一卷最后章}
+  knowledge query-relationships --entity "{protagonist_id}" --at-chapter ${LAST_GLOBAL}
 
 # 活跃伏笔（跨卷未回收的伏笔）
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
@@ -378,12 +383,12 @@ python "${SCRIPTS_DIR}/webnovel.py" --project-root "$PROJECT_ROOT" master-outlin
 
 该步骤只允许更新 `大纲/总纲.md` 的 V+1 卷名 / 核心冲突 / 卷末高潮与伏笔表，不得生成下一卷详细大纲、节拍表、时间线或章纲。
 
-更新状态：
+更新状态（`chapters-range` 为卷内章号，每卷均从 1 开始）：
 
 ```bash
 python "${SCRIPTS_DIR}/webnovel.py" --project-root "$PROJECT_ROOT" update-state -- \
   --volume-planned {volume_id} \
-  --chapters-range "{start}-{end}"
+  --chapters-range "1-{vol_chapter_count}"
 ```
 
 ## 硬失败条件

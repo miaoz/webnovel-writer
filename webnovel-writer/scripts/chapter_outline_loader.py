@@ -87,9 +87,10 @@ def _find_split_outline_file(outline_dir: Path, chapter_num: int) -> Path | None
     return None
 
 
-def _find_volume_outline_file(project_root: Path, chapter_num: int) -> Path | None:
+def _find_volume_outline_file(project_root: Path, chapter_num: int, *, volume_num: int | None = None) -> Path | None:
     outline_dir = project_root / "大纲"
-    volume_num = volume_num_for_chapter_from_state(project_root, chapter_num) or volume_num_for_chapter(chapter_num)
+    if volume_num is None:
+        volume_num = volume_num_for_chapter_from_state(project_root, chapter_num) or volume_num_for_chapter(chapter_num, project_root=project_root)
     candidates = [
         outline_dir / f"第{volume_num}卷-详细大纲.md",
         outline_dir / f"第{volume_num}卷 - 详细大纲.md",
@@ -146,20 +147,33 @@ def _extract_directive_section(content: str, chapter_num: int) -> str | None:
     return _extract_outline_section(content, chapter_num)
 
 
-def load_chapter_outline(project_root: Path, chapter_num: int, max_chars: int | None = 1500) -> str:
+def load_chapter_outline(project_root: Path, chapter_num: int, max_chars: int | None = 1500, *, volume_num: int | None = None) -> str:
+    """Load the outline text for a single chapter.
+
+    Args:
+        project_root: Project root directory.
+        chapter_num: Chapter number.  When *volume_num* is set this is the
+            **volume-local** number (e.g. 5 = "Vol 2 Ch 5").
+        max_chars: If set, truncate the returned text to this length.
+        volume_num: Explicit volume number for per-volume numbering.
+            When omitted the volume is auto-detected from state.json /
+            global-number math.
+    """
     outline_dir = project_root / "大纲"
 
     split_outline = _find_split_outline_file(outline_dir, chapter_num)
     if split_outline is not None:
         return split_outline.read_text(encoding="utf-8")
 
-    volume_outline = _find_volume_outline_file(project_root, chapter_num)
+    volume_outline = _find_volume_outline_file(project_root, chapter_num, volume_num=volume_num)
     if volume_outline is None:
-        return f"⚠️ 大纲文件不存在：第 {chapter_num} 章"
+        vol_hint = f"第{volume_num}卷" if volume_num else f"第 {chapter_num} 章"
+        return f"⚠️ 大纲文件不存在：{vol_hint}"
 
     outline = _extract_outline_section(volume_outline.read_text(encoding="utf-8"), chapter_num)
     if outline is None:
-        return f"⚠️ 未找到第 {chapter_num} 章的大纲"
+        vol_hint = f"第{volume_num}卷第{chapter_num}章" if volume_num else f"第 {chapter_num} 章"
+        return f"⚠️ 未找到{vol_hint}的大纲"
 
     if max_chars and len(outline) > max_chars:
         return outline[:max_chars] + "\n...(已截断)"
@@ -324,8 +338,8 @@ def parse_chapter_plot_structure(outline_text: str) -> Dict[str, Any]:
     }
 
 
-def load_chapter_plot_structure(project_root: Path, chapter_num: int) -> Dict[str, Any]:
-    outline = load_chapter_outline(project_root, chapter_num, max_chars=None)
+def load_chapter_plot_structure(project_root: Path, chapter_num: int, *, volume_num: int | None = None) -> Dict[str, Any]:
+    outline = load_chapter_outline(project_root, chapter_num, max_chars=None, volume_num=volume_num)
     return parse_chapter_plot_structure(outline)
 
 
@@ -378,13 +392,13 @@ def parse_chapter_execution_directive(outline_text: str) -> Dict[str, Any]:
     return directive
 
 
-def load_chapter_execution_directive(project_root: Path, chapter_num: int) -> Dict[str, Any]:
+def load_chapter_execution_directive(project_root: Path, chapter_num: int, *, volume_num: int | None = None) -> Dict[str, Any]:
     outline_dir = project_root / "大纲"
     split_outline = _find_split_outline_file(outline_dir, chapter_num)
     if split_outline is not None:
         return parse_chapter_execution_directive(split_outline.read_text(encoding="utf-8"))
 
-    volume_outline = _find_volume_outline_file(project_root, chapter_num)
+    volume_outline = _find_volume_outline_file(project_root, chapter_num, volume_num=volume_num)
     if volume_outline is None:
         return {}
     section = _extract_directive_section(volume_outline.read_text(encoding="utf-8"), chapter_num)

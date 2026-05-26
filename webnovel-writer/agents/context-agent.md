@@ -23,7 +23,7 @@ model: inherit
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" where
-python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract load-context --chapter {NNNN}
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract load-context --volume {N} --chapter {M}
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract query-entity --id "{entity_id}"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract query-rules --domain "{domain}"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract get-timeline --from {N} --to {M}
@@ -72,10 +72,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 
 ### A：基础包（1 Bash + 1 Read）
 
-1. `load-context --chapter {NNNN}` 获取基础包
-2. `Read` 章纲原文（load-context 的 outline 可能截断）
-3. 确定卷号（优先 runtime contracts / latest commit；必要时兼容读取 state.json 投影）
-4. 若用户明确提供额外的项目级文风/反 AI 味规则文件，读取并只消费规则，不在任务书暴露文件名。
+1. `load-context --volume {N} --chapter {M}` 获取基础包（N=卷号，M=卷内章号）
+2. `Read` 章纲原文（load-context 的 outline 可能截断；Read `大纲/第{N}卷-详细大纲.md` 定位 `### 第 {M} 章`）
+3. 若用户明确提供额外的项目级文风/反 AI 味规则文件，读取并只消费规则，不在任务书暴露文件名。
 
 ### B：按需深查（只查基础包不足的）
 
@@ -101,8 +100,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 ## 4. 输入
 
 ```json
-{"chapter": 100, "project_root": "D:/wk/斗破苍穹", "storage_path": ".webnovel/", "state_file": ".webnovel/state.json"}
+{"volume": 5, "chapter": 12, "project_root": "D:/wk/斗破苍穹", "storage_path": ".webnovel/", "state_file": ".webnovel/state.json"}
 ```
+`volume` 和 `chapter` 分别对应卷号和**卷内**章号。全局章号由 state.json 的 `volumes_planned` 累加计算。
 
 ## 5. 边界
 
@@ -184,4 +184,4 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 | 伏笔数据缺失 | 标注"需人工补录"，不静默跳过 |
 | 章纲无结构化节点 | 跳过情节结构，不阻断 |
 
-章节编号统一 4 位：`0001`、`0099`、`0100`。
+章节编号为**卷内编号**，每卷从 1 开始。文件命名使用 3 位补齐：`第005章-标题.md`。全局编号由 state.json 的 `volumes_planned` 累加自动计算，无需手动处理。
