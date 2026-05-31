@@ -88,6 +88,19 @@ def _extract_cli_subcommands(text: str) -> list[str]:
     return sorted(cmds)
 
 
+def test_webnovel_write_word_count_guidance_uses_current_default():
+    """写章技能及其风格参考不得残留旧的 2000-2500 默认字数。"""
+    files = [
+        SKILLS_DIR / "webnovel-write" / "SKILL.md",
+        SKILLS_DIR / "webnovel-write" / "references" / "style-adapter.md",
+    ]
+
+    combined = "\n".join(_read_text(path) for path in files)
+
+    assert "3500-4000" in combined
+    assert "2000-2500" not in combined
+
+
 # ---------------------------------------------------------------------------
 # 1. Frontmatter 完整性
 # ---------------------------------------------------------------------------

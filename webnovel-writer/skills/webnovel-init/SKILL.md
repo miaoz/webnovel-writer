@@ -403,7 +403,7 @@ python "${SCRIPTS_DIR}/webnovel.py" init \
 init 完成后，立即生成 MASTER_SETTING，让后续 plan 有调性/禁忌参照：
 
 ```bash
-GENRE="$(python -X utf8 -c "import json,os; root=os.environ['PROJECT_ROOT']; s=json.load(open(root + '/.webnovel/state.json',encoding='utf-8')); print(s.get('project',{}).get('genre',''))")"
+GENRE="$(python -X utf8 -c "import json,os; root=os.environ['PROJECT_ROOT']; s=json.load(open(root + '/.webnovel/state.json',encoding='utf-8')); print((s.get('project_info') or {}).get('genre') or (s.get('project') or {}).get('genre',''))")"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
   story-system "${GENRE}" --genre "${GENRE}" --persist --refresh-master --format json

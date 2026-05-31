@@ -136,6 +136,50 @@ def test_story_system_chapter_refresh_does_not_overwrite_master_without_flag(tmp
     assert (story_root / "chapters" / "chapter_003.json").is_file()
 
 
+def test_story_system_cli_reads_project_info_genre_when_argument_missing(tmp_path, monkeypatch):
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text(
+        json.dumps({"project_info": {"genre": "重生+加密金融+AI创业+商战"}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    captured = {}
+
+    class FakeEngine:
+        def __init__(self, csv_dir):
+            pass
+
+        def build(self, query, genre, chapter, chapter_directive=None):
+            captured["genre"] = genre
+            return {
+                "master_setting": {"route": {"primary_genre": genre}},
+                "chapter_brief": {"meta": {"chapter": chapter}, "override_allowed": {"chapter_focus": query}},
+                "anti_patterns": [],
+            }
+
+    monkeypatch.setattr("story_system.StorySystemEngine", FakeEngine)
+
+    from story_system import main
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "story_system",
+            "大额OTC出金",
+            "--project-root",
+            str(project_root),
+            "--chapter",
+            "34",
+            "--format",
+            "json",
+        ],
+    )
+    main()
+
+    assert captured["genre"] == "重生+加密金融+AI创业+商战"
+
+
 def test_story_system_volume_chapter_writes_global_contract(tmp_path, monkeypatch):
     project_root = tmp_path / "book"
     (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)

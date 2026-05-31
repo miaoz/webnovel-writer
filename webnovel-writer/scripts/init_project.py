@@ -37,11 +37,12 @@ if sys.platform == "win32":
 
 
 _ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
 
 def _validate_initial_genre_source(genre: str) -> str:
     normalized = str(genre or "").strip()
-    if _ASCII_LETTER_RE.search(normalized):
+    if _ASCII_LETTER_RE.search(normalized) and not _CJK_RE.search(normalized):
         raise SystemExit(
             "题材必须使用中文名称，不能使用英文 profile key "
             f"'{normalized}'。例如：规则怪谈、悬疑、玄幻。"

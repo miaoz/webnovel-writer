@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from runtime_compat import enable_windows_utf8_stdio
 
@@ -53,6 +54,21 @@ def _render_output(format_name: str, contract: dict) -> str:
     )
 
 
+def _state_genre(project_root: Path) -> str:
+    state_path = project_root / ".webnovel" / "state.json"
+    if not state_path.is_file():
+        return ""
+    try:
+        state: dict[str, Any] = json.loads(state_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ""
+    for key in ("project_info", "project"):
+        genre = str(((state.get(key) or {}).get("genre")) or "").strip()
+        if genre:
+            return genre
+    return ""
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Story system seed generator")
     parser.add_argument("query", help="题材 / 需求描述")
@@ -87,10 +103,11 @@ def main() -> None:
         else {}
     )
     engine = StorySystemEngine(csv_dir=csv_dir)
+    genre = str(args.genre or "").strip() or _state_genre(project_root)
     try:
         contract = engine.build(
             query=args.query,
-            genre=args.genre or None,
+            genre=genre or None,
             chapter=global_chapter or None,
             chapter_directive=chapter_directive,
         )

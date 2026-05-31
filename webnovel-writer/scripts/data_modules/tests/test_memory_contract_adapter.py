@@ -316,6 +316,47 @@ class TestLoadContext:
         assert pack.sections["runtime_status"]["primary_write_source"] == "chapter_commit"
         assert pack.sections["latest_commit"]["meta"]["status"] == "accepted"
 
+    def test_load_context_reads_genre_profile_from_project_info(self, tmp_path):
+        cfg = _make_project(tmp_path)
+        cfg.state_file.write_text(
+            json.dumps({"project_info": {"genre": "都市"}}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        refs_dir = tmp_path / ".claude" / "references"
+        refs_dir.mkdir(parents=True, exist_ok=True)
+        (refs_dir / "genre-profiles.md").write_text(
+            "## 都市\n- 都市画像提示\n\n## 玄幻\n- 玄幻画像提示",
+            encoding="utf-8",
+        )
+
+        adapter = MemoryContractAdapter(cfg)
+        pack = adapter.load_context(3)
+
+        assert "都市画像提示" in pack.sections["genre_profile_excerpt"]
+        assert "玄幻画像提示" not in pack.sections["genre_profile_excerpt"]
+
+    def test_load_context_genre_profile_falls_back_to_project_genre(self, tmp_path):
+        cfg = _make_project(tmp_path)
+        cfg.state_file.write_text(
+            json.dumps(
+                {"project_info": {"title": "测试书名"}, "project": {"genre": "玄幻"}},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        refs_dir = tmp_path / ".claude" / "references"
+        refs_dir.mkdir(parents=True, exist_ok=True)
+        (refs_dir / "genre-profiles.md").write_text(
+            "## 都市\n- 都市画像提示\n\n## 玄幻\n- 玄幻画像提示",
+            encoding="utf-8",
+        )
+
+        adapter = MemoryContractAdapter(cfg)
+        pack = adapter.load_context(3)
+
+        assert "玄幻画像提示" in pack.sections["genre_profile_excerpt"]
+        assert "都市画像提示" not in pack.sections["genre_profile_excerpt"]
+
     def test_load_context_prefers_actual_latest_commit_status(self, tmp_path):
         cfg = _make_project(tmp_path)
         story_root = tmp_path / ".story-system"

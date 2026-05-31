@@ -72,6 +72,23 @@ def test_init_generates_conditional_protagonist_group_and_heroine(tmp_path, monk
     assert (project_root / "设定集" / "女主卡.md").is_file()
 
 
+def test_init_accepts_mixed_chinese_ascii_genre(tmp_path, monkeypatch):
+    import init_project as init_project_module
+
+    monkeypatch.setattr(init_project_module, "is_git_available", lambda: False)
+    project_root = tmp_path / "book"
+
+    init_project_module.init_project(
+        str(project_root),
+        title="测试书",
+        genre="重生+加密金融+AI创业+商战",
+        protagonist_name="陆鸣",
+        target_chapters=50,
+    )
+
+    assert (project_root / ".webnovel" / "state.json").is_file()
+
+
 def test_init_rejects_english_profile_key_before_writing_state(tmp_path, monkeypatch):
     import init_project as init_project_module
 

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import csv
+import json
 import uuid
 from pathlib import Path
 
@@ -187,6 +188,50 @@ def test_story_system_falls_back_to_explicit_genre():
     assert contract["master_setting"]["route"]["recommended_dynamic_tables"] == ["桥段套路", "爽点与节奏", "场景写法"]
 
 
+def test_explicit_composite_urban_genre_overrides_incompatible_keyword_route():
+    csv_dir = Path(__file__).resolve().parents[3] / "references" / "csv"
+    chapter_goal = (
+        "通过烧鹅社群里认识的OTC商人阿坤完成大额出金，见识阿坤经营的出金群的真大佬，"
+        "把四桶资金表里的生活安全垫真正落到账上——完成魔都前第一张入场券："
+        "这笔钱不只是链上数字，而是现实中能调动、能解释、能支配的钱"
+    )
+
+    contract = StorySystemEngine(csv_dir=csv_dir).build(
+        query="通过烧鹅社群里认识的OTC商人阿坤完成大额出金，见识阿坤经营的出金群的真大佬，把四桶资金表里的生活安全垫真正落到账上",
+        genre="重生+加密金融+AI创业+商战",
+        chapter=34,
+        chapter_directive={
+            "goal": chapter_goal,
+            "strand": "Quest",
+            "antagonist_tier": "无",
+            "key_entities": [
+                "OTC商人阿坤",
+                "烧鹅背书",
+                "USDT大额分批",
+                "银行卡流水",
+                "C2C试水经验",
+                "出金记录表",
+                "Cursor",
+                "出金群里一闪而过的冻卡消息——\"老刘的卡又冻了\"被下一笔报价淹没",
+                "本章变化: 阿坤作为圈内OTC渠道正式登场",
+                "顾宜完成从交易所C2C小额试水到熟人背书大额OTC的认知升级",
+                "也把出金",
+                "税务",
+                "银行卡和现实消费纳入资产管理。第一张票拿到了",
+                "但出金群里更大的数字让他明白",
+                "魔都牌桌上的人不会因为2M就把他当主角",
+            ],
+        },
+    )
+
+    route = contract["master_setting"]["route"]
+    assert route["primary_genre"] == "都市"
+    assert route["canonical_genre"] == "都市"
+    assert route["route_source"] == "explicit_genre_generic"
+    assert route["genre_filter"] == "都市"
+    assert "种田" not in json.dumps(contract, ensure_ascii=False)
+
+
 def test_story_system_unmatched_genre_raises_routing_error():
     csv_dir = _make_local_tmp_path() / "csv"
     csv_dir.mkdir()
@@ -226,10 +271,10 @@ def test_story_system_unmatched_genre_raises_routing_error():
     engine = StorySystemEngine(csv_dir=csv_dir)
 
     with pytest.raises(StorySystemRoutingError) as exc:
-        engine.build(query="赛博厨神", genre="赛博厨神", chapter=None)
+        engine.build(query="未知题材", genre="未知题材", chapter=None)
 
     message = str(exc.value)
-    assert "赛博厨神" in message
+    assert "未知题材" in message
     assert "未命中任何路由行" in message
     assert "玄幻退婚流" not in message
 
