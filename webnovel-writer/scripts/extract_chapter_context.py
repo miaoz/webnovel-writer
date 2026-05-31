@@ -308,6 +308,7 @@ def _load_contract_context(project_root: Path, chapter_num: int) -> Dict[str, An
         "runtime_status": payload.get("runtime_status", {}),
         "latest_commit": payload.get("latest_commit", {}),
         "prewrite_validation": payload.get("prewrite_validation", {}),
+        "prewrite_gate": payload.get("prewrite_gate", {}),
         "reader_signal": payload.get("reader_signal", {}),
         "genre_profile": payload.get("genre_profile", {}),
         "writing_guidance": payload.get("writing_guidance", {}),
@@ -343,6 +344,7 @@ def build_chapter_context_payload(project_root: Path, chapter_num: int) -> Dict[
         "runtime_status": contract_context.get("runtime_status", {}),
         "latest_commit": contract_context.get("latest_commit", {}),
         "prewrite_validation": contract_context.get("prewrite_validation", {}),
+        "prewrite_gate": contract_context.get("prewrite_gate", {}),
         "reader_signal": contract_context.get("reader_signal", {}),
         "genre_profile": contract_context.get("genre_profile", {}),
         "writing_guidance": contract_context.get("writing_guidance", {}),
@@ -386,4 +388,3 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         enable_windows_utf8_stdio()
     main()
-

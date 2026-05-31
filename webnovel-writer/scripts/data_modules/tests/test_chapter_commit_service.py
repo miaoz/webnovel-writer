@@ -11,6 +11,17 @@ from data_modules.config import DataModulesConfig
 from data_modules.index_manager import IndexManager
 
 
+def _write_min_contracts(project_root: Path, chapter: int, volume: int = 1) -> None:
+    story_root = project_root / ".story-system"
+    (story_root / "chapters").mkdir(parents=True, exist_ok=True)
+    (story_root / "reviews").mkdir(parents=True, exist_ok=True)
+    (story_root / "volumes").mkdir(parents=True, exist_ok=True)
+    (story_root / "MASTER_SETTING.json").write_text("{}", encoding="utf-8")
+    (story_root / "chapters" / f"chapter_{chapter:03d}.json").write_text("{}", encoding="utf-8")
+    (story_root / "reviews" / f"chapter_{chapter:03d}.review.json").write_text("{}", encoding="utf-8")
+    (story_root / "volumes" / f"volume_{volume:03d}.json").write_text("{}", encoding="utf-8")
+
+
 def test_commit_service_rejects_when_missed_nodes_exist(tmp_path):
     service = ChapterCommitService(tmp_path)
     payload = service.build_commit(
@@ -28,7 +39,42 @@ def test_commit_service_rejects_when_missed_nodes_exist(tmp_path):
     assert payload["meta"]["status"] == "rejected"
 
 
+def test_commit_service_rejects_accepted_native_commit_when_contracts_missing(tmp_path):
+    service = ChapterCommitService(tmp_path)
+
+    with pytest.raises(ValueError, match="missing required story contracts"):
+        service.build_commit(
+            chapter=3,
+            review_result={"blocking_count": 0},
+            fulfillment_result={
+                "planned_nodes": ["发现陷阱"],
+                "covered_nodes": ["发现陷阱"],
+                "missed_nodes": [],
+                "extra_nodes": [],
+            },
+            disambiguation_result={"pending": []},
+            extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
+        )
+
+
+def test_commit_service_allows_repair_backfill_without_contracts(tmp_path):
+    service = ChapterCommitService(tmp_path)
+    payload = service.build_commit(
+        chapter=3,
+        review_result={"blocking_count": 0},
+        fulfillment_result={"planned_nodes": ["发现陷阱"], "covered_nodes": ["发现陷阱"], "missed_nodes": [], "extra_nodes": []},
+        disambiguation_result={"pending": []},
+        extraction_result={"state_deltas": [], "entity_deltas": [], "accepted_events": []},
+        commit_mode="repair_backfill",
+    )
+
+    assert payload["meta"]["status"] == "accepted"
+    assert payload["provenance"]["commit_mode"] == "repair_backfill"
+    assert payload["provenance"]["legacy_state_role"] == "projection_only"
+
+
 def test_commit_service_accepts_when_all_checks_pass(tmp_path):
+    _write_min_contracts(tmp_path, 3)
     service = ChapterCommitService(tmp_path)
     payload = service.build_commit(
         chapter=3,
@@ -45,6 +91,7 @@ def test_commit_service_accepts_when_all_checks_pass(tmp_path):
 
 
 def test_commit_service_includes_volume_ref_and_write_fact_provenance(tmp_path):
+    _write_min_contracts(tmp_path, 3)
     service = ChapterCommitService(tmp_path)
     payload = service.build_commit(
         chapter=3,
@@ -56,6 +103,7 @@ def test_commit_service_includes_volume_ref_and_write_fact_provenance(tmp_path):
 
     assert payload["contract_refs"]["volume"] == "volume_001.json"
     assert payload["provenance"]["write_fact_role"] == "chapter_commit"
+    assert payload["provenance"]["commit_mode"] == "native_write"
     assert payload["provenance"]["projection_role"] == "derived_read_models"
 
 
@@ -211,6 +259,7 @@ def test_commit_service_rejects_non_object_accepted_event_items(tmp_path):
 
 
 def test_commit_service_normalizes_accepted_events_before_projection(tmp_path):
+    _write_min_contracts(tmp_path, 76, volume=2)
     service = ChapterCommitService(tmp_path)
 
     payload = service.build_commit(
@@ -290,6 +339,7 @@ def test_apply_projections_normalizes_events_before_router_inspection(
 
 
 def test_chapter_commit_cli_builds_and_persists_commit(tmp_path, monkeypatch):
+    _write_min_contracts(tmp_path, 3)
     review_path = tmp_path / "review.json"
     fulfillment_path = tmp_path / "fulfillment.json"
     disambiguation_path = tmp_path / "disambiguation.json"
@@ -333,6 +383,7 @@ def test_chapter_commit_cli_builds_and_persists_commit(tmp_path, monkeypatch):
 
 
 def test_apply_projections_writes_events_and_amend_proposals(tmp_path):
+    _write_min_contracts(tmp_path, 3)
     service = ChapterCommitService(tmp_path)
     payload = service.build_commit(
         chapter=3,

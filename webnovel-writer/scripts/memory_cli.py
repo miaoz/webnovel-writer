@@ -26,6 +26,7 @@ _ensure_scripts_path()
 
 from data_modules.config import DataModulesConfig
 from data_modules.memory_contract_adapter import MemoryContractAdapter
+from chapter_paths import global_from_volume_chapter
 
 
 def _adapter(project_root: str) -> MemoryContractAdapter:
@@ -39,7 +40,12 @@ def _json_out(data) -> None:
 
 def cmd_load_context(args: argparse.Namespace) -> None:
     adapter = _adapter(args.project_root)
-    pack = adapter.load_context(args.chapter)
+    chapter = (
+        global_from_volume_chapter(Path(args.project_root), args.volume, args.chapter)
+        if args.volume
+        else args.chapter
+    )
+    pack = adapter.load_context(chapter)
     _json_out(pack.to_dict())
 
 
@@ -82,6 +88,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command")
 
     p_load = sub.add_parser("load-context", help="加载章节上下文基础包")
+    p_load.add_argument("--volume", type=int, default=0, help="显式卷号；传入时 --chapter 为卷内章节")
     p_load.add_argument("--chapter", type=int, required=True)
 
     p_entity = sub.add_parser("query-entity", help="查询实体快照")

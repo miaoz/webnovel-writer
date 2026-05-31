@@ -15,11 +15,17 @@ class RuntimeContractBuilder:
     def __init__(self, project_root: Path):
         self.project_root = Path(project_root)
 
-    def build_for_chapter(self, chapter: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def build_for_chapter(
+        self,
+        chapter: int,
+        *,
+        volume_num: int | None = None,
+        chapter_in_volume: int | None = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         master = self._load_master_setting()
         anti_patterns = self._load_anti_patterns()
-        plot = self._load_plot_structure(chapter)
-        volume = self._resolve_volume(chapter)
+        plot = self._load_plot_structure(chapter_in_volume or chapter, volume_num=volume_num)
+        volume = volume_num or self._resolve_volume(chapter)
 
         volume_brief = VolumeBrief.model_validate(
             {
@@ -55,8 +61,8 @@ class RuntimeContractBuilder:
         raw = read_json_if_exists(self.project_root / ".story-system" / "anti_patterns.json") or []
         return list(raw)
 
-    def _load_plot_structure(self, chapter: int) -> Dict[str, Any]:
-        raw = load_chapter_plot_structure(self.project_root, chapter) or {}
+    def _load_plot_structure(self, chapter: int, *, volume_num: int | None = None) -> Dict[str, Any]:
+        raw = load_chapter_plot_structure(self.project_root, chapter, volume_num=volume_num) or {}
         return {
             "mandatory_nodes": list(raw.get("mandatory_nodes") or []),
             "prohibitions": list(raw.get("prohibitions") or []),

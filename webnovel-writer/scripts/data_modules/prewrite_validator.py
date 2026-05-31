@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .placeholder_scanner import scan_placeholders
+from .story_prewrite_gate import run_prewrite_gate
 
 
 class PrewriteValidator:
@@ -44,12 +45,16 @@ class PrewriteValidator:
         related_placeholders = self._related_placeholders(story_contract)
         if related_placeholders:
             blocking_reasons.append("当前章节相关设定存在未补齐占位")
+        strict_gate = run_prewrite_gate(self.project_root, chapter).to_dict()
+        if not strict_gate["ready"]:
+            blocking_reasons.extend(strict_gate["blocking_reasons"])
         return {
             "chapter": chapter,
-            "blocking": bool(pending) or bool(missing_contracts) or bool(related_placeholders),
+            "blocking": bool(pending) or bool(missing_contracts) or bool(related_placeholders) or not strict_gate["ready"],
             "blocking_reasons": blocking_reasons,
             "missing_contracts": missing_contracts,
             "related_placeholders": related_placeholders,
+            "strict_gate": strict_gate,
             "forbidden_zones": list(review_contract.get("blocking_rules") or []),
             "disambiguation_domain": {
                 "pending_count": len(pending),

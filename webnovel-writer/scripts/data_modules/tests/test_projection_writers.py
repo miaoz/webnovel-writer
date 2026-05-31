@@ -13,6 +13,17 @@ from data_modules.state_projection_writer import StateProjectionWriter
 from data_modules.summary_projection_writer import SummaryProjectionWriter
 
 
+def _write_min_story_contracts(project_root, chapter: int, volume: int = 1) -> None:
+    story_root = project_root / ".story-system"
+    (story_root / "chapters").mkdir(parents=True, exist_ok=True)
+    (story_root / "reviews").mkdir(parents=True, exist_ok=True)
+    (story_root / "volumes").mkdir(parents=True, exist_ok=True)
+    (story_root / "MASTER_SETTING.json").write_text("{}", encoding="utf-8")
+    (story_root / "volumes" / f"volume_{volume:03d}.json").write_text("{}", encoding="utf-8")
+    (story_root / "chapters" / f"chapter_{chapter:03d}.json").write_text("{}", encoding="utf-8")
+    (story_root / "reviews" / f"chapter_{chapter:03d}.review.json").write_text("{}", encoding="utf-8")
+
+
 def test_state_projection_writer_handles_rejected_commit(tmp_path):
     (tmp_path / ".webnovel").mkdir(parents=True, exist_ok=True)
     (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
@@ -57,6 +68,7 @@ def test_accepted_chapter_commits_advance_progress_and_word_count(tmp_path):
 
     service = ChapterCommitService(tmp_path)
     for chapter in (1, 2):
+        _write_min_story_contracts(tmp_path, chapter)
         payload = service.build_commit(
             chapter=chapter,
             review_result={"blocking_count": 0},
@@ -194,6 +206,7 @@ def test_accepted_commit_updates_state_json_end_to_end(tmp_path):
     (tmp_path / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
 
     service = ChapterCommitService(tmp_path)
+    _write_min_story_contracts(tmp_path, 3)
     commit_payload = service.build_commit(
         chapter=3,
         review_result={"blocking_count": 0},
@@ -364,6 +377,7 @@ def test_accepted_commit_writes_chapter_index_tables(tmp_path):
     (chapters_dir / "第0003章.md").write_text("第三章正文内容", encoding="utf-8")
 
     service = ChapterCommitService(tmp_path)
+    _write_min_story_contracts(tmp_path, 3)
     payload = service.build_commit(
         chapter=3,
         review_result={"blocking_count": 0},

@@ -68,6 +68,7 @@ def test_story_system_persist_writes_master_chapter_and_anti_patterns(tmp_path, 
             "--chapter",
             "1",
             "--persist",
+            "--refresh-master",
             "--csv-dir",
             str(csv_dir),
             "--format",
@@ -85,6 +86,112 @@ def test_story_system_persist_writes_master_chapter_and_anti_patterns(tmp_path, 
 
     payload = json.loads((story_root / "MASTER_SETTING.json").read_text(encoding="utf-8"))
     assert payload["route"]["primary_genre"] == "玄幻退婚流"
+
+
+def test_story_system_chapter_refresh_does_not_overwrite_master_without_flag(tmp_path, monkeypatch):
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    story_root = project_root / ".story-system"
+    story_root.mkdir(parents=True)
+    (story_root / "MASTER_SETTING.json").write_text(
+        json.dumps({"route": {"primary_genre": "旧全书题材"}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    class FakeEngine:
+        def __init__(self, csv_dir):
+            pass
+
+        def build(self, query, genre, chapter, chapter_directive=None):
+            return {
+                "master_setting": {"route": {"primary_genre": "新章节目标"}},
+                "chapter_brief": {"meta": {"chapter": chapter}, "override_allowed": {"chapter_focus": query}},
+                "anti_patterns": [],
+            }
+
+    monkeypatch.setattr("story_system.StorySystemEngine", FakeEngine)
+
+    from story_system import main
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "story_system",
+            "盘点第一桶金",
+            "--project-root",
+            str(project_root),
+            "--chapter",
+            "3",
+            "--persist",
+            "--format",
+            "json",
+        ],
+    )
+    main()
+
+    master = json.loads((story_root / "MASTER_SETTING.json").read_text(encoding="utf-8"))
+    assert master["route"]["primary_genre"] == "旧全书题材"
+    assert (story_root / "chapters" / "chapter_003.json").is_file()
+
+
+def test_story_system_volume_chapter_writes_global_contract(tmp_path, monkeypatch):
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text(
+        json.dumps(
+            {
+                "progress": {
+                    "volumes_planned": [
+                        {"volume": 1, "chapters_range": "1-50"},
+                        {"volume": 2, "chapters_range": "1-50"},
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    outline_dir = project_root / "大纲"
+    outline_dir.mkdir()
+    (outline_dir / "第1卷-详细大纲.md").write_text("> 卷范围: 第1-48章\n", encoding="utf-8")
+    (outline_dir / "第2卷-详细大纲.md").write_text("### 第 1 章：卷二开局\n- 目标: 开局", encoding="utf-8")
+
+    class FakeEngine:
+        def __init__(self, csv_dir):
+            pass
+
+        def build(self, query, genre, chapter, chapter_directive=None):
+            return {
+                "master_setting": {"route": {"primary_genre": "旧全书题材"}},
+                "chapter_brief": {"meta": {"chapter": chapter}, "override_allowed": {"chapter_focus": query}},
+                "anti_patterns": [],
+            }
+
+    monkeypatch.setattr("story_system.StorySystemEngine", FakeEngine)
+
+    from story_system import main
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "story_system",
+            "卷二开局",
+            "--project-root",
+            str(project_root),
+            "--volume",
+            "2",
+            "--chapter",
+            "1",
+            "--persist",
+            "--format",
+            "json",
+        ],
+    )
+    main()
+
+    assert (project_root / ".story-system" / "chapters" / "chapter_049.json").is_file()
 
 
 def test_markdown_writer_preserves_manual_notes_outside_markers(tmp_path):

@@ -66,6 +66,8 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
   story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --volume {volume_num} --chapter {chapter_in_volume} --persist --emit-runtime-contracts --format both
 ```
 
+规划/章节级刷新不得传 `--refresh-master`；全书 MASTER_SETTING 只在 init 或明确全书级重种子时更新。
+
 生成后必须把 `.story-system/MASTER_SETTING.json`、`.story-system/volumes/`、
 `.story-system/chapters/`、`.story-system/reviews/` 视为后续写作主链输入。
 规划开始/结束都运行 `placeholder-scan`；plan 阶段发现占位先警告并补齐相关文件，进入写章前不得保留当前章相关实体的 `[待...]` / `暂名` / `{占位}`。

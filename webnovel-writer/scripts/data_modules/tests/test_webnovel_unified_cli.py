@@ -216,6 +216,74 @@ def test_webnovel_story_system_runtime_forwards(monkeypatch, tmp_path):
     assert "--emit-runtime-contracts" in called["argv"]
 
 
+def test_webnovel_story_repair_audit_outputs_json(monkeypatch, tmp_path, capsys):
+    module = _load_webnovel_module()
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "data_modules.story_repair.provenance_auditor.audit_project",
+        lambda root, start=1, end=None: {
+            "chapters": [{"chapter": start, "classification": "native"}],
+            "state_anomalies": [],
+            "stale_files": [],
+            "contract_anomalies": [],
+            "numbering_anomalies": [],
+            "recommended_actions": [],
+        },
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "webnovel",
+            "--project-root",
+            str(project_root),
+            "story-repair",
+            "audit",
+            "--chapters",
+            "3-5",
+            "--format",
+            "json",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["chapters"][0]["chapter"] == 3
+
+
+def test_webnovel_prewrite_check_exits_two_when_blocked(monkeypatch, tmp_path, capsys):
+    module = _load_webnovel_module()
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+
+    class Result:
+        ready = False
+
+        def to_dict(self):
+            return {"chapter": 34, "ready": False, "blocking_reasons": ["missing_chapter_contract"]}
+
+    monkeypatch.setattr("data_modules.story_prewrite_gate.run_prewrite_gate", lambda *args, **kwargs: Result())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["webnovel", "--project-root", str(project_root), "prewrite-check", "--chapter", "34"],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["blocking_reasons"] == ["missing_chapter_contract"]
+
+
 def test_webnovel_commit_forwards(monkeypatch, tmp_path):
     module = _load_webnovel_module()
     project_root = tmp_path / "book"
@@ -236,6 +304,51 @@ def test_webnovel_commit_forwards(monkeypatch, tmp_path):
 
     assert int(exc.value.code or 0) == 0
     assert called["script_name"] == "chapter_commit.py"
+
+
+def test_webnovel_commit_converts_volume_chapter(monkeypatch, tmp_path):
+    module = _load_webnovel_module()
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    outline_dir = project_root / "大纲"
+    outline_dir.mkdir(parents=True)
+    (outline_dir / "第1卷-详细大纲.md").write_text("> 卷范围: 第1-48章\n### 第 1 章：开端\n", encoding="utf-8")
+    (outline_dir / "第2卷-详细大纲.md").write_text("> 卷范围: 第1-50章\n### 第 1 章：新局\n", encoding="utf-8")
+    called = {}
+
+    def _fake_run_script(script_name, argv):
+        called["script_name"] = script_name
+        called["argv"] = list(argv)
+        return 0
+
+    monkeypatch.setattr(module, "_run_script", _fake_run_script)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "webnovel",
+            "--project-root",
+            str(project_root),
+            "chapter-commit",
+            "--volume",
+            "2",
+            "--chapter",
+            "1",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 0
+    assert called["script_name"] == "chapter_commit.py"
+    assert called["argv"][:4] == [
+        "--project-root",
+        str(project_root.resolve()),
+        "--chapter",
+        "49",
+    ]
 
 
 def test_webnovel_story_events_forwards(monkeypatch, tmp_path):
@@ -521,6 +634,55 @@ def test_review_pipeline_forwards_with_resolved_project_root(monkeypatch, tmp_pa
         "--report-file",
         "审查报告/第18章.md",
         "--save-metrics",
+    ]
+
+
+def test_review_pipeline_converts_volume_chapter(monkeypatch, tmp_path):
+    module = _load_webnovel_module()
+
+    book_root = (tmp_path / "book").resolve()
+    (book_root / ".webnovel").mkdir(parents=True)
+    (book_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    outline_dir = book_root / "大纲"
+    outline_dir.mkdir(parents=True)
+    (outline_dir / "第1卷-详细大纲.md").write_text("> 卷范围: 第1-48章\n### 第 1 章：开端\n", encoding="utf-8")
+    (outline_dir / "第2卷-详细大纲.md").write_text("> 卷范围: 第1-50章\n### 第 1 章：新局\n", encoding="utf-8")
+    review_results = (tmp_path / "review_results.json").resolve()
+    called = {}
+
+    def _fake_run_script(script_name, argv):
+        called["script_name"] = script_name
+        called["argv"] = list(argv)
+        return 0
+
+    monkeypatch.setattr(module, "_run_script", _fake_run_script)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "webnovel",
+            "--project-root",
+            str(book_root),
+            "review-pipeline",
+            "--volume",
+            "2",
+            "--chapter",
+            "1",
+            "--review-results",
+            str(review_results),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 0
+    assert called["script_name"] == "review_pipeline.py"
+    assert called["argv"][:4] == [
+        "--project-root",
+        str(book_root),
+        "--chapter",
+        "49",
     ]
 
 
@@ -834,7 +996,9 @@ def test_webnovel_skill_flow_runs_story_contract_context_and_review_pipeline_wit
         context_payload["story_contract"]["review_contract"]["meta"]["contract_type"]
         == "REVIEW_CONTRACT"
     )
-    assert context_payload["prewrite_validation"]["blocking"] is False
+    assert context_payload["prewrite_validation"]["blocking"] is True
+    assert "previous_accepted_commit_not_latest" in context_payload["prewrite_validation"]["blocking_reasons"]
+    assert context_payload["prewrite_gate"]["ready"] is False
     assert context_payload["rag_assist"]["invoked"] is True
     assert context_payload["rag_assist"]["hits"]
     assert calls["embed_batch"] >= 1

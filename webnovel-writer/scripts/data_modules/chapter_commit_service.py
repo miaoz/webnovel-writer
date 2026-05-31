@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, Dict
 
 from chapter_outline_loader import volume_num_for_chapter_from_state
+from chapter_paths import find_chapter_file
 
 from .chapter_commit_schema import (
     DisambiguationResult,
@@ -17,6 +19,8 @@ from .config import DataModulesConfig
 from .event_log_store import EventLogStore
 from .event_projection_router import EventProjectionRouter
 from .story_contracts import write_json
+from .story_contracts import StoryContractPaths
+from .story_repair.outline_catalog import load_outline_catalog
 from .index_manager import IndexManager
 from .override_ledger_service import (
     AmendProposalTrigger,
@@ -36,7 +40,11 @@ class ChapterCommitService:
         fulfillment_result: Dict[str, Any],
         disambiguation_result: Dict[str, Any],
         extraction_result: Dict[str, Any],
+        *,
+        commit_mode: str = "native_write",
     ) -> Dict[str, Any]:
+        if commit_mode not in {"native_write", "repair_backfill"}:
+            raise ValueError("commit_mode must be native_write or repair_backfill")
         review = ReviewResult.model_validate(review_result)
         fulfillment = FulfillmentResult.model_validate(fulfillment_result)
         disambiguation = DisambiguationResult.model_validate(disambiguation_result)
@@ -46,9 +54,25 @@ class ChapterCommitService:
         ) or bool(disambiguation.pending)
         status = "rejected" if rejected else "accepted"
         volume = volume_num_for_chapter_from_state(self.project_root, chapter) or 1
+        paths = StoryContractPaths.from_project_root(self.project_root)
+        contract_paths = [
+            paths.master_json,
+            paths.volume_json(volume),
+            paths.chapter_json(chapter),
+            paths.review_json(chapter),
+        ]
+        missing_contracts = [path.name for path in contract_paths if not path.is_file()]
+        if status == "accepted" and commit_mode == "native_write" and missing_contracts:
+            raise ValueError(
+                "missing required story contracts for native accepted commit: "
+                + ", ".join(missing_contracts)
+            )
         accepted_events = EventLogStore(self.project_root).normalize_events(
             chapter, extraction.accepted_events
         )
+        body_sha256 = self._body_sha256(chapter)
+        outline_sha256 = self._outline_sha256(chapter)
+        contract_sha256 = self._contracts_sha256(contract_paths)
         return {
             "meta": {
                 "schema_version": "story-system/v1",
@@ -63,6 +87,10 @@ class ChapterCommitService:
             },
             "provenance": {
                 "write_fact_role": "chapter_commit",
+                "commit_mode": commit_mode,
+                "body_sha256": body_sha256,
+                "outline_sha256": outline_sha256,
+                "contract_sha256": contract_sha256,
                 "projection_role": "derived_read_models",
                 "legacy_state_role": "projection_only",
             },
@@ -91,6 +119,31 @@ class ChapterCommitService:
                 "vector": "pending",
             },
         }
+
+    def _body_sha256(self, chapter: int) -> str:
+        path = find_chapter_file(self.project_root, chapter)
+        if not path or not path.is_file():
+            return ""
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def _outline_sha256(self, chapter: int) -> str:
+        for record in load_outline_catalog(self.project_root):
+            if record.global_chapter == chapter:
+                return record.outline_hash
+        return ""
+
+    def _contracts_sha256(self, paths: list[Path]) -> str:
+        hasher = hashlib.sha256()
+        found = False
+        for path in paths:
+            if not path.is_file():
+                continue
+            found = True
+            hasher.update(path.name.encode("utf-8"))
+            hasher.update(b"\0")
+            hasher.update(path.read_bytes())
+            hasher.update(b"\0")
+        return hasher.hexdigest() if found else ""
 
     def persist_commit(self, payload: Dict[str, Any]) -> Path:
         target = self.project_root / ".story-system" / "commits"

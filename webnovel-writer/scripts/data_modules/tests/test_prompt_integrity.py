@@ -30,7 +30,7 @@ ALL_PROMPT_FILES = AGENT_FILES + SKILL_FILES
 
 # webnovel.py 注册的子命令（从 add_parser 提取）
 REGISTERED_CLI_SUBCOMMANDS = {
-    "where", "preflight", "use",
+    "where", "preflight", "prewrite-check", "use",
     "index", "state", "rag", "style", "entity", "context", "memory",
     "migrate", "status", "update-state", "backup", "archive",
     "init", "extract-context", "memory-contract", "project-memory", "review-pipeline",
@@ -357,6 +357,18 @@ def test_webnovel_write_data_agent_prompt_requires_extraction_schema():
     assert "accepted_events/state_deltas/entity_deltas" in text
     assert "禁止包在 chapter/fulfillment/disambiguation/extraction" in text
     assert "event_id/chapter/event_type/subject/payload" in text
+
+
+def test_webnovel_amend_reruns_review_extraction_and_commit():
+    text = (SKILLS_DIR / "webnovel-amend" / "SKILL.md").read_text(encoding="utf-8")
+    assert 'subagent_type: "webnovel-writer:reviewer"' in text
+    assert 'subagent_type: "webnovel-writer:data-agent"' in text
+    assert "prewrite-check" in text
+    assert "--rewrite" in text
+    assert "review-pipeline" in text
+    assert "chapter-commit" in text
+    assert "--commit-mode native_write" in text
+    assert "projection_status" in text
 
 
 def test_dashboard_and_plan_skills_surface_story_runtime_mainline():

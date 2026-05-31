@@ -12,6 +12,7 @@ from runtime_compat import enable_windows_utf8_stdio
 from data_modules.runtime_contract_builder import RuntimeContractBuilder
 from data_modules.story_contracts import persist_runtime_contracts, persist_story_seed
 from data_modules.story_system_engine import StorySystemEngine, StorySystemRoutingError, is_placeholder_query
+from chapter_paths import global_from_volume_chapter
 from chapter_outline_loader import load_chapter_execution_directive
 
 
@@ -57,8 +58,10 @@ def main() -> None:
     parser.add_argument("query", help="题材 / 需求描述")
     parser.add_argument("--project-root", default="")
     parser.add_argument("--genre", default="")
+    parser.add_argument("--volume", type=int, default=0)
     parser.add_argument("--chapter", type=int, default=0)
     parser.add_argument("--persist", action="store_true")
+    parser.add_argument("--refresh-master", action="store_true")
     parser.add_argument("--emit-runtime-contracts", action="store_true")
     parser.add_argument("--csv-dir", default="")
     parser.add_argument("--format", choices=["json", "markdown", "both"], default="json")
@@ -66,14 +69,21 @@ def main() -> None:
     args = parser.parse_args()
     project_root = _resolve_project_root(args.project_root)
     csv_dir = Path(args.csv_dir).expanduser().resolve() if args.csv_dir else _default_csv_dir()
+    requested_chapter = int(args.chapter or 0)
+    volume_num = int(args.volume or 0) or None
+    global_chapter = (
+        global_from_volume_chapter(project_root, volume_num, requested_chapter)
+        if volume_num and requested_chapter
+        else requested_chapter
+    )
     if is_placeholder_query(args.query):
         print(
             "warning: story-system query appears to be a placeholder; parse the real chapter goal from the outline.",
             file=sys.stderr,
         )
     chapter_directive = (
-        load_chapter_execution_directive(project_root, args.chapter)
-        if args.chapter
+        load_chapter_execution_directive(project_root, requested_chapter, volume_num=volume_num)
+        if requested_chapter
         else {}
     )
     engine = StorySystemEngine(csv_dir=csv_dir)
@@ -81,24 +91,34 @@ def main() -> None:
         contract = engine.build(
             query=args.query,
             genre=args.genre or None,
-            chapter=args.chapter or None,
+            chapter=global_chapter or None,
             chapter_directive=chapter_directive,
         )
     except StorySystemRoutingError as exc:
         parser.exit(2, f"error: {exc}\n")
 
     if args.persist:
+        should_refresh_master = bool(
+            args.refresh_master
+            or not global_chapter
+            or not (project_root / ".story-system" / "MASTER_SETTING.json").is_file()
+        )
         persist_story_seed(
             project_root=project_root,
             master_payload=contract["master_setting"],
             chapter_payload=contract.get("chapter_brief"),
             anti_patterns=contract["anti_patterns"],
+            refresh_master=should_refresh_master,
         )
     if args.emit_runtime_contracts:
-        if not args.chapter:
+        if not global_chapter:
             raise ValueError("--emit-runtime-contracts 需要 --chapter")
-        volume_brief, review_contract = RuntimeContractBuilder(project_root).build_for_chapter(args.chapter)
-        persist_runtime_contracts(project_root, args.chapter, volume_brief, review_contract)
+        volume_brief, review_contract = RuntimeContractBuilder(project_root).build_for_chapter(
+            global_chapter,
+            volume_num=volume_num,
+            chapter_in_volume=requested_chapter if volume_num else None,
+        )
+        persist_runtime_contracts(project_root, global_chapter, volume_brief, review_contract, volume=volume_num)
 
     print(_render_output(args.format, contract))
 

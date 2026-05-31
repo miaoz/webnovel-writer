@@ -236,6 +236,14 @@ def test_context_manager_includes_story_contract_and_prewrite_validation(temp_pr
         ),
         encoding="utf-8",
     )
+    (story_root / "commits").mkdir(parents=True, exist_ok=True)
+    (story_root / "commits" / "chapter_002.commit.json").write_text(
+        json.dumps(
+            {"meta": {"schema_version": "story-system/v1", "chapter": 2, "status": "accepted"}},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     temp_project.outline_dir.mkdir(parents=True, exist_ok=True)
     (temp_project.outline_dir / "第1卷-详细大纲.md").write_text(
         "### 第3章：试炼\n必须覆盖节点：发现陷阱\n本章禁区：不可提前摊牌",
@@ -247,8 +255,10 @@ def test_context_manager_includes_story_contract_and_prewrite_validation(temp_pr
 
     assert "story_contract" in payload
     assert "prewrite_validation" in payload
+    assert "prewrite_gate" in payload
     assert payload["story_contract"]["review_contract"]["meta"]["contract_type"] == "REVIEW_CONTRACT"
     assert payload["prewrite_validation"]["fulfillment_seed"]["planned_nodes"] == ["发现陷阱"]
+    assert payload["prewrite_gate"]["ready"] is True
     payload_keys = list(payload.keys())
     assert payload_keys.index("story_contract") < payload_keys.index("scene")
 

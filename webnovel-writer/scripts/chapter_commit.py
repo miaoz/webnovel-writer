@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument("--fulfillment-result", required=True)
     parser.add_argument("--disambiguation-result", required=True)
     parser.add_argument("--extraction-result", required=True)
+    parser.add_argument("--commit-mode", choices=["native_write", "repair_backfill"], default="native_write")
     args = parser.parse_args()
 
     service = ChapterCommitService(Path(args.project_root))
@@ -33,6 +34,7 @@ def main() -> None:
         fulfillment_result=_read_json(args.fulfillment_result),
         disambiguation_result=_read_json(args.disambiguation_result),
         extraction_result=_read_json(args.extraction_result),
+        commit_mode=args.commit_mode,
     )
     service.persist_commit(payload)
     if payload["meta"]["status"] == "accepted":

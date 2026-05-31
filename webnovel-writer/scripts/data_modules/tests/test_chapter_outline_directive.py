@@ -4,6 +4,7 @@
 import json
 
 from chapter_outline_loader import load_chapter_execution_directive
+from chapter_paths import global_from_volume_chapter, volume_chapter_from_global, volume_num_for_chapter
 
 
 def test_load_chapter_execution_directive_from_volume_outline(tmp_path):
@@ -53,3 +54,35 @@ def test_load_chapter_execution_directive_from_volume_outline(tmp_path):
     assert "不得离开宗门" in directive["forbidden_zones"]
     assert "借据" in directive["key_entities"]
     assert directive["chapter_end_open_question"] == "谁改了借据？"
+
+
+def test_volume_global_conversion_prefers_outline_ranges_over_stale_state(tmp_path):
+    (tmp_path / ".webnovel").mkdir()
+    (tmp_path / ".webnovel" / "state.json").write_text(
+        json.dumps(
+            {
+                "progress": {
+                    "volumes_planned": [
+                        {"volume": 1, "chapters_range": "1-50"},
+                        {"volume": 2, "chapters_range": "1-50"},
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    outline_dir = tmp_path / "大纲"
+    outline_dir.mkdir()
+    (outline_dir / "第1卷-详细大纲.md").write_text(
+        "> 卷范围: 第1-48章\n\n### 第 48 章：卷一尾声\n- 目标: 收束",
+        encoding="utf-8",
+    )
+    (outline_dir / "第2卷-详细大纲.md").write_text(
+        "> 卷范围: 第1-50章\n\n### 第 1 章：卷二开局\n- 目标: 开局",
+        encoding="utf-8",
+    )
+
+    assert global_from_volume_chapter(tmp_path, 1, 33) == 33
+    assert global_from_volume_chapter(tmp_path, 2, 1) == 49
+    assert volume_chapter_from_global(tmp_path, 49) == (2, 1)
+    assert volume_num_for_chapter(49, project_root=tmp_path) == 2

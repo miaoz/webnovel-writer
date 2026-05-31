@@ -36,6 +36,17 @@ def _make_project(tmp_path: Path) -> DataModulesConfig:
     return DataModulesConfig.from_project_root(tmp_path)
 
 
+def _write_min_story_contracts(project_root: Path, chapter: int, volume: int = 1) -> None:
+    story_root = project_root / ".story-system"
+    (story_root / "chapters").mkdir(parents=True, exist_ok=True)
+    (story_root / "reviews").mkdir(parents=True, exist_ok=True)
+    (story_root / "volumes").mkdir(parents=True, exist_ok=True)
+    (story_root / "MASTER_SETTING.json").write_text("{}", encoding="utf-8")
+    (story_root / "volumes" / f"volume_{volume:03d}.json").write_text("{}", encoding="utf-8")
+    (story_root / "chapters" / f"chapter_{chapter:03d}.json").write_text("{}", encoding="utf-8")
+    (story_root / "reviews" / f"chapter_{chapter:03d}.review.json").write_text("{}", encoding="utf-8")
+
+
 class TestAdapterSatisfiesProtocol:
     def test_isinstance_check(self, tmp_path):
         cfg = _make_project(tmp_path)
@@ -355,6 +366,7 @@ class TestCommitChapter:
 
     def test_commit_chapter_delegates_to_chapter_commit_mainline(self, tmp_path):
         cfg = _make_project(tmp_path)
+        _write_min_story_contracts(tmp_path, 3)
         adapter = MemoryContractAdapter(cfg)
 
         result = adapter.commit_chapter(

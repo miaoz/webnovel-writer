@@ -178,16 +178,23 @@ def persist_story_seed(
     master_payload: Dict[str, Any],
     chapter_payload: Dict[str, Any] | None,
     anti_patterns: List[Dict[str, Any]],
+    *,
+    refresh_master: bool = True,
 ) -> None:
     paths = StoryContractPaths.from_project_root(project_root)
     paths.root.mkdir(parents=True, exist_ok=True)
     paths.chapters_dir.mkdir(parents=True, exist_ok=True)
-    write_json(paths.master_json, master_payload)
-    write_json(paths.anti_patterns_json, anti_patterns)
-    write_marked_markdown(paths.master_json.with_suffix(".md"), render_master_markdown(master_payload))
+    if refresh_master:
+        write_json(paths.master_json, master_payload)
+        write_marked_markdown(paths.master_json.with_suffix(".md"), render_master_markdown(master_payload))
+
+    existing_anti_patterns = read_json_if_exists(paths.anti_patterns_json) or []
+    if not isinstance(existing_anti_patterns, list):
+        existing_anti_patterns = []
+    write_json(paths.anti_patterns_json, merge_anti_patterns(existing_anti_patterns, anti_patterns))
     write_marked_markdown(
         paths.anti_patterns_json.with_suffix(".md"),
-        render_anti_patterns_markdown(anti_patterns),
+        render_anti_patterns_markdown(read_json_if_exists(paths.anti_patterns_json) or []),
     )
     if chapter_payload is not None:
         chapter_num = int(chapter_payload["meta"]["chapter"])
@@ -203,9 +210,11 @@ def persist_runtime_contracts(
     chapter: int,
     volume_brief: Dict[str, Any],
     review_contract: Dict[str, Any],
+    *,
+    volume: int | None = None,
 ) -> None:
     paths = StoryContractPaths.from_project_root(project_root)
-    volume = volume_num_for_chapter_from_state(paths.project_root, chapter) or 1
+    volume = volume or volume_num_for_chapter_from_state(paths.project_root, chapter) or 1
     paths.volumes_dir.mkdir(parents=True, exist_ok=True)
     paths.reviews_dir.mkdir(parents=True, exist_ok=True)
     write_json(paths.volume_json(volume), volume_brief)

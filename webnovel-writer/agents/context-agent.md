@@ -23,6 +23,7 @@ model: inherit
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" where
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" prewrite-check --volume {N} --chapter {M}
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract load-context --volume {N} --chapter {M}
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract query-entity --id "{entity_id}"
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" memory-contract query-rules --domain "{domain}"
@@ -41,9 +42,9 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 
 ### load-context 已包含的数据（不要重复查）
 
-`story_contracts`（MASTER/volume/chapter/review 合同）、`recent_summaries`（近 2 章摘要）、`urgent_loops`（前 3 条紧急伏笔）、`active_rules`（前 5 条世界规则）、`protagonist`（主角状态）、`memory_pack`（追读力数据）、`genre_profile_excerpt`（当前题材画像）。
+`story_contracts`（MASTER/volume/chapter/review 合同）、`prewrite_gate`（写前闸门结果）、`recent_summaries`（近 2 章摘要）、`urgent_loops`（前 3 条紧急伏笔）、`active_rules`（前 5 条世界规则）、`protagonist`（主角状态）、`memory_pack`（追读力数据）、`genre_profile_excerpt`（当前题材画像）。
 
-只有 load-context 返回空 contracts 时才直接 Read `.story-system/*.json`。
+写章模式中，缺少合同、review contract、章纲哈希或投影陈旧必须阻断，不得直接降级写作。legacy fallback 只用于查询/诊断；若 `commit_mode=repair_backfill`，只能说明历史链路由修复重建，不证明原生写作曾使用该上下文。
 
 ### 裁决层（在 chapter 合同的 `reasoning` 对象中）
 
@@ -72,9 +73,10 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 
 ### A：基础包（1 Bash + 1 Read）
 
-1. `load-context --volume {N} --chapter {M}` 获取基础包（N=卷号，M=卷内章号）
-2. `Read` 章纲原文（load-context 的 outline 可能截断；Read `大纲/第{N}卷-详细大纲.md` 定位 `### 第 {M} 章`）
-3. 若用户明确提供额外的项目级文风/反 AI 味规则文件，读取并只消费规则，不在任务书暴露文件名。
+1. `prewrite-check --volume {N} --chapter {M}`；`ready=false` 时输出阻断原因并停止。
+2. `load-context --volume {N} --chapter {M}` 获取基础包（N=卷号，M=卷内章号）
+3. `Read` 章纲原文（load-context 的 outline 可能截断；Read `大纲/第{N}卷-详细大纲.md` 定位 `### 第 {M} 章`）
+4. 若用户明确提供额外的项目级文风/反 AI 味规则文件，读取并只消费规则，不在任务书暴露文件名。
 
 ### B：按需深查（只查基础包不足的）
 
@@ -103,6 +105,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 {"volume": 5, "chapter": 12, "project_root": "D:/wk/斗破苍穹", "storage_path": ".webnovel/", "state_file": ".webnovel/state.json"}
 ```
 `volume` 和 `chapter` 分别对应卷号和**卷内**章号。全局章号由 state.json 的 `volumes_planned` 累加计算。
+若详细大纲声明了 `卷范围`，工具以大纲范围优先换算全局章号，`state.json` 只作兼容投影。
 
 ## 5. 边界
 
@@ -179,7 +182,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "{project_root}" extr
 | 场景 | 处理 |
 |------|------|
 | load-context 返回空 | 降级为 `extract-context --format json` |
-| contracts 缺失 | 标明 legacy fallback |
+| contracts/prewrite_gate 缺失或 ready=false | 写章阻断；仅查询可标明 legacy fallback |
 | chapter_meta 缺失 | 跳过"接住上章" |
 | 伏笔数据缺失 | 标注"需人工补录"，不静默跳过 |
 | 章纲无结构化节点 | 跳过情节结构，不阻断 |

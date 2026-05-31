@@ -21,6 +21,7 @@ allowed-tools: Read Grep Write Edit Bash Agent AskUserQuestion
 - ❌ 把 report 文件生成等同于已落库（`save-review-metrics` 未跑）
 - ❌ 主流程伪造 `overall_score` 或审查结论
 - ❌ 按需参考一次性全部读完
+- ❌ 把 `repair_backfill` commit 当作当时原生写作证据
 
 ## 优先级链
 
@@ -57,10 +58,13 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
   story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --volume {volume_num} --chapter {chapter_in_volume} --persist --emit-runtime-contracts --format both
 ```
 
+章节级审查补合同不得传 `--refresh-master`；该参数只用于 init 或明确的全书级重种子，避免覆盖已有 MASTER_SETTING。
+
 要求：
 - `PROJECT_ROOT` 必须包含 `.webnovel/state.json`
 - 任一关键目录不存在时立即阻断
 - `CHAPTER_GOAL` 必须来自详细大纲真实目标；若 `chapter_brief.meta.query` 仍是 `{章纲目标}` / `第N章章纲目标`，按系统问题记录。
+- 缺少 `.story-system/reviews/chapter_{NNN}.review.json` 时先补合同；审查结论不得只依赖 legacy 投影。
 - 中高严重度 `ai_flavor` issue 会由 review-pipeline 回流到 `.story-system/anti_patterns.json`，作为后续写章避雷模式。
 
 ### Step 2：按需加载参考资料

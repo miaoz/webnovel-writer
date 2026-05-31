@@ -29,6 +29,7 @@ from .config import get_config
 from .index_manager import IndexManager, WritingChecklistScoreMeta
 from .context_ranker import ContextRanker
 from .prewrite_validator import PrewriteValidator
+from .story_prewrite_gate import run_prewrite_gate
 from .story_contracts import read_json_if_exists
 from .story_runtime_sources import RuntimeSourceSnapshot, load_runtime_sources
 from .context_weights import (
@@ -73,6 +74,7 @@ class ContextManager:
         "runtime_status",
         "latest_commit",
         "prewrite_validation",
+        "prewrite_gate",
     }
     SECTION_ORDER = [
         "core",
@@ -80,6 +82,7 @@ class ContextManager:
         "runtime_status",
         "latest_commit",
         "prewrite_validation",
+        "prewrite_gate",
         "scene",
         "global",
         "reader_signal",
@@ -240,6 +243,7 @@ class ContextManager:
             plot_structure=plot_structure,
             story_contract=story_contract,
         )
+        prewrite_gate = run_prewrite_gate(self.config.project_root, chapter).to_dict()
 
         return {
             "meta": {"chapter": chapter},
@@ -248,6 +252,7 @@ class ContextManager:
             "runtime_status": runtime_status,
             "latest_commit": latest_commit,
             "prewrite_validation": prewrite_validation,
+            "prewrite_gate": prewrite_gate,
             "scene": scene,
             "global": global_ctx,
             "reader_signal": reader_signal,

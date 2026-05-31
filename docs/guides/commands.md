@@ -40,6 +40,15 @@
 /webnovel-review 45
 ```
 
+### `/webnovel-amend [章号]`
+
+对已提交章节的人工修订重新入链：复审当前正文、重新提取事实、覆盖该章 `CHAPTER_COMMIT` 并刷新投影。
+
+```bash
+/webnovel-amend 3
+/webnovel-amend 12
+```
+
 ### `/webnovel-query [关键词]`
 
 查询角色、伏笔、节奏、状态等运行时信息。

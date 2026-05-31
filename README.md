@@ -78,6 +78,7 @@ RERANK_API_KEY=your_rerank_api_key
 /webnovel-plan 1      # 规划第 1 卷大纲
 /webnovel-write 1     # 写第 1 章
 /webnovel-review 1-5  # 审查第 1-5 章
+/webnovel-amend 3     # 修订已提交章节后重新入链
 ```
 
 ### 6) 可视化面板（可选）

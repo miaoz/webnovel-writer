@@ -31,6 +31,8 @@ _OUTLINE_HEADING_RE = re.compile(
 _SPLIT_OUTLINE_FILENAME_RE = re.compile(
     r"^第0*(?P<num>\d+)章[-—_ ]+(?P<title>.+?)\.md$"
 )
+_OUTLINE_VOLUME_FILE_RE = re.compile(r"第\s*(?P<volume>\d+)\s*卷.*详细大纲\.md$")
+_OUTLINE_RANGE_RE = re.compile(r"卷范围\s*[：:]\s*第\s*(?P<start>\d+)\s*-\s*(?P<end>\d+)\s*章")
 
 
 # ---------------------------------------------------------------------------
@@ -75,12 +77,53 @@ def _parse_chapter_count(chapters_range: str) -> int:
     return max(0, end - start + 1)
 
 
+def _parse_outline_chapter_count(text: str) -> int:
+    match = _OUTLINE_RANGE_RE.search(text or "")
+    if match:
+        start, end = int(match.group("start")), int(match.group("end"))
+        return max(0, end - start + 1)
+
+    chapters = [
+        int(item)
+        for item in re.findall(r"^###\s*第\s*(\d+)\s*章[：:]", text or "", flags=re.MULTILINE)
+    ]
+    return max(chapters or [0])
+
+
+def _load_outline_volume_counts(project_root: Path) -> dict[int, int]:
+    outline_dir = project_root / "大纲"
+    if not outline_dir.is_dir():
+        return {}
+    counts: dict[int, int] = {}
+    for path in sorted(outline_dir.glob("第*卷*详细大纲.md")):
+        match = _OUTLINE_VOLUME_FILE_RE.search(path.name)
+        if not match:
+            continue
+        volume = int(match.group("volume"))
+        try:
+            count = _parse_outline_chapter_count(path.read_text(encoding="utf-8"))
+        except OSError:
+            count = 0
+        if count > 0:
+            counts[volume] = count
+    return counts
+
+
 def _compute_global_offsets(project_root: Path) -> dict[int, int]:
     """Return ``{volume_num: global_offset_before_this_volume}``.
 
     The offset is the sum of chapter counts of all *preceding* volumes.
     Volume 1 always has offset 0.
     """
+    outline_counts = _load_outline_volume_counts(project_root)
+    if outline_counts:
+        offsets: dict[int, int] = {}
+        running = 0
+        for volume in sorted(outline_counts):
+            offsets[volume] = running
+            running += outline_counts[volume]
+        return offsets
+
     volumes = _load_volumes_planned(project_root)
     offsets: dict[int, int] = {}
     running = 0

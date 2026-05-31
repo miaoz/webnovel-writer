@@ -49,6 +49,17 @@ def _resolve_root(explicit_project_root: Optional[str]) -> Path:
     return resolve_project_root()
 
 
+def _resolve_global_chapter(project_root: Path, chapter: int, volume: int = 0) -> int:
+    if not volume:
+        return int(chapter)
+    try:
+        from chapter_paths import global_from_volume_chapter
+    except ImportError:  # pragma: no cover
+        from scripts.chapter_paths import global_from_volume_chapter
+
+    return global_from_volume_chapter(project_root, int(volume), int(chapter))
+
+
 def _strip_project_root_args(argv: list[str]) -> list[str]:
     """
     下游工具统一由本入口注入 `--project-root`，避免重复传参导致 argparse 报错/歧义。
@@ -269,6 +280,87 @@ def cmd_use(args: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_chapter_range(value: str) -> tuple[int, int]:
+    text = str(value or "").strip()
+    if not text:
+        raise argparse.ArgumentTypeError("章节范围不能为空")
+    if "-" not in text:
+        chapter = int(text)
+        return chapter, chapter
+    start_s, _, end_s = text.partition("-")
+    start = int(start_s)
+    end = int(end_s)
+    if start <= 0 or end < start:
+        raise argparse.ArgumentTypeError(f"无效章节范围: {value}")
+    return start, end
+
+
+def cmd_story_repair(args: argparse.Namespace) -> int:
+    project_root = _resolve_root(args.project_root)
+    action = args.repair_action
+
+    if action == "audit":
+        from .story_repair import provenance_auditor
+
+        start, end = _parse_chapter_range(args.chapters)
+        report = provenance_auditor.audit_project(project_root, start=start, end=end)
+        if args.format == "json":
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            for row in report["chapters"]:
+                marker = "!" if row.get("repair_required") else "-"
+                print(f"{marker} ch{row['chapter']:04d} {row['classification']}")
+            if report["state_anomalies"]:
+                print("state_anomalies:")
+                for item in report["state_anomalies"]:
+                    print(f"- {item}")
+        return 0
+
+    if action == "rebuild":
+        from .story_repair import rebuild_service
+
+        start, end = _parse_chapter_range(args.chapters)
+        if args.apply:
+            if not args.ledger:
+                raise SystemExit("story-repair rebuild --apply requires --ledger")
+            plan = rebuild_service.apply_rebuild_from_ledger(
+                project_root,
+                start=start,
+                end=end,
+                ledger_path=args.ledger,
+            )
+        else:
+            plan = rebuild_service.build_rebuild_plan(
+                project_root,
+                start=start,
+                end=end,
+                dry_run=True,
+                report_file=args.report_file or None,
+            )
+        print(json.dumps(plan, ensure_ascii=False, indent=2))
+        return 0
+
+    if action == "archive-stale":
+        from .story_repair import archive_service
+
+        result = archive_service.archive_stale_artifacts(project_root, apply=bool(args.apply))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    raise SystemExit(2)
+
+
+def cmd_prewrite_check(args: argparse.Namespace) -> int:
+    project_root = _resolve_root(args.project_root)
+    chapter = _resolve_global_chapter(project_root, int(args.chapter), int(args.volume or 0))
+
+    from . import story_prewrite_gate
+
+    result = story_prewrite_gate.run_prewrite_gate(project_root, chapter, rewrite=bool(args.rewrite))
+    print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    return 0 if result.ready else 2
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="webnovel unified CLI")
     parser.add_argument("--project-root", help="书项目根目录或工作区根目录（可选，默认自动检测）")
@@ -281,6 +373,12 @@ def main() -> None:
     p_preflight = sub.add_parser("preflight", help="校验统一 CLI 运行环境与 project_root")
     p_preflight.add_argument("--format", choices=["text", "json"], default="text", help="输出格式")
     p_preflight.set_defaults(func=cmd_preflight)
+
+    p_prewrite = sub.add_parser("prewrite-check", help="严格写前检查 Story System 主链")
+    p_prewrite.add_argument("--volume", type=int, default=0, help="显式卷号；传入时 --chapter 为卷内章节")
+    p_prewrite.add_argument("--chapter", type=int, required=True, help="目标章节号")
+    p_prewrite.add_argument("--rewrite", action="store_true", help="允许目标章节已有 accepted commit")
+    p_prewrite.set_defaults(func=cmd_prewrite_check)
 
     p_use = sub.add_parser("use", help="绑定当前工作区使用的书项目（写入指针/registry）")
     p_use.add_argument("project_root", help="书项目根目录（必须包含 .webnovel/state.json）")
@@ -335,17 +433,38 @@ def main() -> None:
     p_story_system = sub.add_parser("story-system", help="转发到 story_system.py")
     p_story_system.add_argument("args", nargs=argparse.REMAINDER)
 
+    p_story_repair = sub.add_parser("story-repair", help="审计/重建 Story System 证据链")
+    repair_sub = p_story_repair.add_subparsers(dest="repair_action", required=True)
+
+    p_repair_audit = repair_sub.add_parser("audit", help="审计正文、大纲、合同、提交与投影")
+    p_repair_audit.add_argument("--chapters", default="1-1", help="章节范围，如 1-33")
+    p_repair_audit.add_argument("--format", choices=["text", "json"], default="text")
+
+    p_repair_rebuild = repair_sub.add_parser("rebuild", help="生成或应用修复重建计划")
+    p_repair_rebuild.add_argument("--chapters", default="1-1", help="章节范围，如 1-33")
+    p_repair_rebuild.add_argument("--dry-run", action="store_true", help="仅生成计划")
+    p_repair_rebuild.add_argument("--apply", action="store_true", help="应用已接受的 ledger 重建")
+    p_repair_rebuild.add_argument("--ledger", default="", help="已接受的 ledger JSON")
+    p_repair_rebuild.add_argument("--report-file", default="", help="dry-run 报告路径")
+
+    p_repair_archive = repair_sub.add_parser("archive-stale", help="归档旧 context/tmp 证据链碎片")
+    p_repair_archive.add_argument("--dry-run", action="store_true", help="仅列出将归档文件")
+    p_repair_archive.add_argument("--apply", action="store_true", help="移动文件并写 manifest")
+    p_story_repair.set_defaults(func=cmd_story_repair)
+
     p_story_events = sub.add_parser("story-events", help="转发到 story_events.py")
     p_story_events.add_argument("--chapter", type=int, default=0, help="目标章节号")
     p_story_events.add_argument("--limit", type=int, default=200, help="查询条数")
     p_story_events.add_argument("--health", action="store_true", help="输出事件链健康信息")
 
     p_commit = sub.add_parser("chapter-commit", help="转发到 chapter_commit.py")
+    p_commit.add_argument("--volume", type=int, default=0, help="显式卷号；传入时 --chapter 为卷内章节")
     p_commit.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_commit.add_argument("--review-result", default="", help="review_result JSON 文件")
     p_commit.add_argument("--fulfillment-result", default="", help="fulfillment_result JSON 文件")
     p_commit.add_argument("--disambiguation-result", default="", help="disambiguation_result JSON 文件")
     p_commit.add_argument("--extraction-result", default="", help="extraction_result JSON 文件")
+    p_commit.add_argument("--commit-mode", choices=["native_write", "repair_backfill"], default="native_write")
 
     p_memory_contract = sub.add_parser("memory-contract", help="转发到 memory_cli.py")
     p_memory_contract.add_argument("args", nargs=argparse.REMAINDER)
@@ -354,6 +473,7 @@ def main() -> None:
     p_project_memory.add_argument("args", nargs=argparse.REMAINDER)
 
     p_review_pipeline = sub.add_parser("review-pipeline", help="转发到 review_pipeline.py")
+    p_review_pipeline.add_argument("--volume", type=int, default=0, help="显式卷号；传入时 --chapter 为卷内章节")
     p_review_pipeline.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_review_pipeline.add_argument("--review-results", required=True, help="reviewer 原始结果 JSON 文件")
     p_review_pipeline.add_argument("--metrics-out", default="", help="metrics 输出文件")
@@ -448,7 +568,8 @@ def main() -> None:
             return_args.append("--health")
         raise SystemExit(_run_script("story_events.py", return_args))
     if tool == "chapter-commit":
-        return_args = [*forward_args, "--chapter", str(args.chapter)]
+        chapter = _resolve_global_chapter(project_root, int(args.chapter), int(args.volume or 0))
+        return_args = [*forward_args, "--chapter", str(chapter)]
         if args.review_result:
             return_args.extend(["--review-result", str(args.review_result)])
         if args.fulfillment_result:
@@ -457,15 +578,18 @@ def main() -> None:
             return_args.extend(["--disambiguation-result", str(args.disambiguation_result)])
         if args.extraction_result:
             return_args.extend(["--extraction-result", str(args.extraction_result)])
+        if args.commit_mode:
+            return_args.extend(["--commit-mode", str(args.commit_mode)])
         raise SystemExit(_run_script("chapter_commit.py", return_args))
     if tool == "memory-contract":
         raise SystemExit(_run_script("memory_cli.py", [*forward_args, *rest]))
     if tool == "project-memory":
         raise SystemExit(_run_script("project_memory.py", [*forward_args, *rest]))
     if tool == "review-pipeline":
+        chapter = _resolve_global_chapter(project_root, int(args.chapter), int(args.volume or 0))
         return_args = [
             *forward_args,
-            "--chapter", str(args.chapter),
+            "--chapter", str(chapter),
             "--review-results", str(args.review_results),
         ]
         if args.metrics_out:

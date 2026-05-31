@@ -6,6 +6,42 @@ import json
 from data_modules.prewrite_validator import PrewriteValidator
 
 
+def _write_ready_gate_files(project_root, chapter: int) -> None:
+    story_root = project_root / ".story-system"
+    (story_root / "chapters").mkdir(parents=True, exist_ok=True)
+    (story_root / "reviews").mkdir(parents=True, exist_ok=True)
+    (story_root / "volumes").mkdir(parents=True, exist_ok=True)
+    (story_root / "commits").mkdir(parents=True, exist_ok=True)
+    (story_root / "MASTER_SETTING.json").write_text('{"meta":{"contract_type":"MASTER_SETTING"}}', encoding="utf-8")
+    (story_root / "volumes" / "volume_001.json").write_text('{"meta":{"contract_type":"VOLUME_BRIEF"}}', encoding="utf-8")
+    (story_root / "chapters" / f"chapter_{chapter:03d}.json").write_text(
+        json.dumps({"chapter_directive": {"goal": "发现陷阱"}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (story_root / "reviews" / f"chapter_{chapter:03d}.review.json").write_text(
+        '{"meta":{"contract_type":"REVIEW_CONTRACT"}}',
+        encoding="utf-8",
+    )
+    (story_root / "commits" / "chapter_002.commit.json").write_text(
+        json.dumps({"meta": {"chapter": 2, "status": "accepted"}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    outline_dir = project_root / "大纲"
+    outline_dir.mkdir(parents=True, exist_ok=True)
+    (outline_dir / "第1卷-详细大纲.md").write_text(
+        "\n".join(
+            [
+                "> 卷范围: 第1-3章",
+                "### 第 1 章：开端",
+                "### 第 2 章：承接",
+                "### 第 3 章：发现陷阱",
+                "- 目标：发现陷阱",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_prewrite_validator_builds_disambiguation_domain_and_fulfillment_seed(tmp_path):
     project_root = tmp_path
     (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
@@ -20,6 +56,7 @@ def test_prewrite_validator_builds_disambiguation_domain_and_fulfillment_seed(tm
         ),
         encoding="utf-8",
     )
+    _write_ready_gate_files(project_root, 3)
     review_contract = {"must_check": ["发现陷阱"], "blocking_rules": ["不可提前摊牌"]}
     plot_structure = {"mandatory_nodes": ["发现陷阱"], "prohibitions": ["不可提前摊牌"]}
 

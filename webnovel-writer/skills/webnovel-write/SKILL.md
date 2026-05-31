@@ -22,6 +22,7 @@ allowed-tools: Read Write Edit Grep Bash Agent
 
 - 禁止并步、跳步、伪造审查
 - 必须使用 `Agent` 工具调用指定 subagent；不得用主流程口头代替 subagent 输出
+- 写前 `prewrite-check` 必须 `ready=true`；`ready=false` 时先补合同/提交链，不进入 Step 1
 - blocking issue 未解决不进 Step 4/5
 - 失败只补跑失败步骤，不回退
 - 参考资料按步骤按需加载
@@ -64,6 +65,8 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
   story-system "${CHAPTER_GOAL}" --genre "${GENRE}" --volume {volume_num} --chapter {chapter_in_volume} --persist --emit-runtime-contracts --format both
 ```
 
+章节刷新不得传 `--refresh-master`，避免覆盖全书调性与禁忌；只有 init 或明确的全书级重种子才使用 `--refresh-master`。
+
 必备文件：`MASTER_SETTING.json`（调性/禁忌）、`volume_{NNN}.json`（卷级节奏）、`chapter_{NNN}.review.json`（必须节点/禁区）。缺失则阻断。
 
 `chapter_{NNN}.json` 必须优先检查顶层 `chapter_directive`。`chapter_focus` 只能来自 `chapter_directive.goal` 或真实 query，不得从 `dynamic_context` 的参考摘要继承。
@@ -75,6 +78,15 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
 4. 风格指引：reasoning、主角卡 OOC 警戒、anti_patterns
 5. 场景写法补充：`dynamic_context`，仅作风格参考，不能覆盖章纲约束
 
+### 准备：写前闸门
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
+  prewrite-check --volume {volume_num} --chapter {chapter_in_volume}
+```
+
+`ready=false` 时停止写作并修复输出的 blocking_reasons。`previous_commit_is_repair_backfill_not_native_write_proof` 只是提示上一章证据来自修复回填，可继续写，但不得把它当作当时原生写作证据。
+
 ### Step 1：context-agent 生成写作任务书
 
 必须使用 `Agent` 工具调用 `context-agent`，不得由主流程自行整理任务书。
@@ -82,7 +94,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" \
 ```text
 Agent(
   subagent_type: "webnovel-writer:context-agent",
-  prompt: "volume={volume_num} chapter={chapter_in_volume}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先 research，再按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
+  prompt: "volume={volume_num} chapter={chapter_in_volume}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先确认 prewrite-check ready=true，再 research，并按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
 )
 ```
 
@@ -145,10 +157,11 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
   --review-result "${PROJECT_ROOT}/.webnovel/tmp/review_results.json" \
   --fulfillment-result "${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json" \
   --disambiguation-result "${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json" \
-  --extraction-result "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json"
+  --extraction-result "${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json" \
+  --commit-mode native_write
 ```
 
-自动判定：blocking_count>0 或 missed_nodes 非空 或 pending 非空 → rejected，否则 accepted。
+自动判定：blocking_count>0 或 missed_nodes 非空 或 pending 非空 → rejected，否则 accepted。`native_write` 模式缺少目标章合同或 review contract 时会拒绝写入；`repair_backfill` 只允许 story-repair 重建使用。
 
 #### 5.3 验证投影
 
@@ -173,11 +186,12 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" bac
 ## 充分性闸门
 
 1. 正文文件存在且非空
-2. 审查已落库（`--minimal` 除外）
-3. blocking=true 必须停在 Step 3
-4. anti_ai_force_check=pass（`--minimal` 除外）
-5. accepted CHAPTER_COMMIT，projection 五项 done/skipped
-6. chapter_status=committed（projection 自动推进）
+2. `prewrite-check ready=true`
+3. 审查已落库（`--minimal` 除外）
+4. blocking=true 必须停在 Step 3
+5. anti_ai_force_check=pass（`--minimal` 除外）
+6. accepted CHAPTER_COMMIT，projection 五项 done/skipped
+7. chapter_status=committed（projection 自动推进）
 
 ## 失败恢复
 
