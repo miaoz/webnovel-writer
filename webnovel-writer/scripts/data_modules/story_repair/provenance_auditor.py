@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ except ImportError:  # pragma: no cover
     from scripts.chapter_paths import find_chapter_file
 
 from data_modules.story_contracts import StoryContractPaths, read_json_if_exists
+from data_modules.story_repair.outline_catalog import OutlineChapterRecord
 from data_modules.story_repair.outline_catalog import load_outline_catalog
 
 
@@ -38,6 +40,12 @@ def _commit_status(payload: Any) -> str:
     if not payload:
         return "missing"
     return str((payload.get("meta") or {}).get("status") or "exists")
+
+
+def _sha256_file(path: Path | None) -> str:
+    if path is None or not path.is_file():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _projection_status(payload: Any) -> str:
@@ -67,7 +75,56 @@ def _classify(row: dict[str, Any]) -> str:
         return "missing_write_contracts"
     if row["commit"] == "missing":
         return "missing_commit"
+    if row.get("hash_mismatches"):
+        return "provenance_hash_mismatch"
     return "native"
+
+
+def _expected_outline_hash(payload: dict[str, Any] | None) -> str:
+    if not payload:
+        return ""
+    for source in (
+        payload.get("provenance") or {},
+        payload.get("source") or {},
+        payload.get("meta") or {},
+    ):
+        value = str(source.get("outline_hash") or source.get("source_outline_hash") or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _hash_mismatches(
+    *,
+    body_hash: str,
+    outline_record: OutlineChapterRecord | None,
+    commit_payload: dict[str, Any] | None,
+    chapter_contract: dict[str, Any] | None,
+    review_contract: dict[str, Any] | None,
+) -> list[str]:
+    if not commit_payload:
+        return []
+
+    mismatches: list[str] = []
+    provenance = commit_payload.get("provenance") or {}
+    expected_body = str(provenance.get("body_sha256") or "").strip()
+    expected_commit_outline = str(provenance.get("outline_sha256") or "").strip()
+    current_outline = outline_record.outline_hash if outline_record else ""
+
+    if expected_body and body_hash and expected_body != body_hash:
+        mismatches.append("body_sha256")
+    if expected_commit_outline and current_outline and expected_commit_outline != current_outline:
+        mismatches.append("commit_outline_sha256")
+
+    expected_chapter_outline = _expected_outline_hash(chapter_contract)
+    if expected_chapter_outline and current_outline and expected_chapter_outline != current_outline:
+        mismatches.append("chapter_contract_outline_hash")
+
+    expected_review_outline = _expected_outline_hash(review_contract)
+    if expected_review_outline and current_outline and expected_review_outline != current_outline:
+        mismatches.append("review_contract_outline_hash")
+
+    return mismatches
 
 
 def _stale_context_snapshots(project_root: Path) -> list[dict[str, Any]]:
@@ -148,9 +205,15 @@ def audit_project(project_root: Path, start: int = 1, end: int | None = None) ->
 
     chapters: list[dict[str, Any]] = []
     contract_anomalies: list[dict[str, Any]] = []
+    outline_by_chapter = {record.global_chapter: record for record in load_outline_catalog(project_root)}
     for chapter in range(start, end + 1):
         body = find_chapter_file(project_root, chapter)
         commit_payload = read_json_if_exists(paths.commit_json(chapter))
+        chapter_contract = read_json_if_exists(paths.chapter_json(chapter))
+        review_contract = read_json_if_exists(paths.review_json(chapter))
+        body_hash = _sha256_file(body)
+        outline_record = outline_by_chapter.get(chapter)
+        outline_hash = outline_record.outline_hash if outline_record else ""
         row = {
             "chapter": chapter,
             "body": "exists" if body else "missing",
@@ -159,7 +222,16 @@ def audit_project(project_root: Path, start: int = 1, end: int | None = None) ->
             "review_contract": _status_exists(paths.review_json(chapter)),
             "commit": _commit_status(commit_payload),
             "projection": _projection_status(commit_payload),
+            "current_body_sha256": body_hash,
+            "current_outline_sha256": outline_hash,
         }
+        row["hash_mismatches"] = _hash_mismatches(
+            body_hash=body_hash,
+            outline_record=outline_record,
+            commit_payload=commit_payload,
+            chapter_contract=chapter_contract,
+            review_contract=review_contract,
+        )
         row["classification"] = _classify(row)
         row["repair_required"] = row["classification"] != "native"
         chapters.append(row)
@@ -189,4 +261,3 @@ def audit_project(project_root: Path, start: int = 1, end: int | None = None) ->
         "numbering_anomalies": _numbering_anomalies(project_root, state),
         "recommended_actions": recommended_actions,
     }
-

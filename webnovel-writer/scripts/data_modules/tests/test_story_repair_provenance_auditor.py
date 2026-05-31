@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+import hashlib
 
 from data_modules.story_repair.provenance_auditor import audit_project
 
@@ -18,6 +19,60 @@ def _write_body(project_root, chapter: int) -> None:
     body_dir = project_root / "正文" / "第1卷"
     body_dir.mkdir(parents=True, exist_ok=True)
     (body_dir / f"第{chapter:04d}章-测试.md").write_text("正文", encoding="utf-8")
+
+
+def test_audit_requires_current_body_and_outline_hashes(tmp_path):
+    body_dir = tmp_path / "正文" / "第1卷"
+    body_dir.mkdir(parents=True)
+    body_path = body_dir / "第0001章-测试.md"
+    body_path.write_text("新版正文", encoding="utf-8")
+
+    outline_dir = tmp_path / "大纲"
+    outline_dir.mkdir()
+    outline_section = "### 第 1 章：测试\n- 目标: 新版目标\n"
+    outline_dir.joinpath("第1卷-详细大纲.md").write_text(
+        "> 卷范围: 第1-1章\n\n" + outline_section,
+        encoding="utf-8",
+    )
+    current_outline_hash = hashlib.sha256(outline_section.strip().encode("utf-8")).hexdigest()
+
+    story_root = tmp_path / ".story-system"
+    for directory in ("chapters", "reviews", "commits"):
+        (story_root / directory).mkdir(parents=True, exist_ok=True)
+    stale_hash = "0" * 64
+    (story_root / "chapters" / "chapter_001.json").write_text(
+        json.dumps({"provenance": {"outline_hash": stale_hash}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (story_root / "reviews" / "chapter_001.review.json").write_text(
+        json.dumps({"provenance": {"outline_hash": stale_hash}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (story_root / "commits" / "chapter_001.commit.json").write_text(
+        json.dumps(
+            {
+                "meta": {"chapter": 1, "status": "accepted"},
+                "provenance": {"body_sha256": stale_hash, "outline_sha256": stale_hash},
+                "projection_status": {"state": "done"},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    report = audit_project(tmp_path, start=1, end=1)
+
+    row = report["chapters"][0]
+    assert row["classification"] == "provenance_hash_mismatch"
+    assert row["repair_required"] is True
+    assert row["hash_mismatches"] == [
+        "body_sha256",
+        "commit_outline_sha256",
+        "chapter_contract_outline_hash",
+        "review_contract_outline_hash",
+    ]
+    assert row["current_body_sha256"] == hashlib.sha256(body_path.read_bytes()).hexdigest()
+    assert row["current_outline_sha256"] == current_outline_hash
 
 
 def test_audit_classifies_accepted_commit_without_write_contracts(tmp_path):
