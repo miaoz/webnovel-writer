@@ -194,11 +194,12 @@ class StorySystemEngine:
         query_text = self._normalize_text(" ".join([query or "", genre or ""]))
         inferred_canonical = "" if genre else self._infer_genre_from_text(query)
         explicit_canonical = self._primary_resolved_genre(genre)
+        explicit_filter = explicit_canonical if explicit_canonical in GENRE_CANONICAL else ""
 
         matched = None
         route_source = ""
         for row in route_rows:
-            if explicit_canonical and not self._row_matches_canonical(row, explicit_canonical):
+            if explicit_filter and not self._row_matches_canonical(row, explicit_filter):
                 continue
             aliases = (
                 self._split_multi_value(row.get("关键词"))
