@@ -94,12 +94,18 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 必须使用 `Agent` 工具调用 `context-agent`，不得由主流程自行整理任务书。
 
+#### Claude Code path
+
 ```text
 Agent(
   subagent_type: "webnovel-writer:context-agent",
   prompt: "volume={volume_num} chapter={chapter_in_volume}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}; storage_path=${PROJECT_ROOT}/.webnovel; state_file=${PROJECT_ROOT}/.webnovel/state.json（projection/read-model，仅兼容读取）。先确认 prewrite-check ready=true，再 research，并按 本章硬性约束→CBN/CPNs/CEN→本章禁区→风格指引→dynamic_context补充参考 的顺序输出五段写作任务书。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `context-agent inline protocol`。使用同样的 `volume/chapter/project_root/scripts_dir` 输入，生成同等写作任务书后再进入 Step 2。
 
 产物：一份写作任务书，能独立支撑 Step 2 起草。
 
@@ -111,12 +117,18 @@ Agent(
 
 必须使用 `Agent` 工具调用 `reviewer`，不得由主流程伪造审查 JSON。
 
+#### Claude Code path
+
 ```text
 Agent(
   subagent_type: "webnovel-writer:reviewer",
   prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `reviewer inline protocol`。必须先写出 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json`，再运行下方 `review-pipeline`。
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
@@ -143,12 +155,18 @@ blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/t
 
 必须使用 `Agent` 工具调用 `data-agent`，产出 fulfillment_result / disambiguation_result / extraction_result 三份 JSON，并复用 Step 3 的 review_results。
 
+#### Claude Code path
+
 ```text
 Agent(
   subagent_type: "webnovel-writer:data-agent",
   prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。从正文提取事实，生成 .webnovel/tmp/ 下的 fulfillment_result.json、disambiguation_result.json、extraction_result.json；fulfillment_result.json 必须顶层包含 planned_nodes/covered_nodes/missed_nodes/extra_nodes；disambiguation_result.json 必须顶层包含 pending；extraction_result.json 必须严格按你的第7节格式输出顶层字段 accepted_events/state_deltas/entity_deltas/entities_appeared/scenes/summary_text，禁止包在 chapter/fulfillment/disambiguation/extraction 等外层对象里；accepted_events 子项必须包含 event_id/chapter/event_type/subject/payload；不直接写 state/index/summaries/memory。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `data-agent inline protocol`。必须写出 `${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json`、`${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json`、`${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json` 后再进入 CHAPTER_COMMIT。
 
 Data Agent 只提取事实+生成 artifacts，不直接写 state/index/summaries/memory。
 

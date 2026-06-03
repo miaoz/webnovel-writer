@@ -102,12 +102,18 @@ cat "${PROJECT_ROOT}/.webnovel/state.json"
 
 必须通过 `Agent` 工具调用 `reviewer`，禁止主流程伪造结论或口头总结代替 subagent 输出。
 
+#### Claude Code path
+
 ```text
 Agent(
   subagent_type: "webnovel-writer:reviewer",
   prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file={chapter_file}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `reviewer inline protocol`。必须写出 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json` 后再运行 Step 5 的 `review-pipeline`。
 
 输入：
 - `chapter`
@@ -159,7 +165,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" ind
 python "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" update-state -- --add-review "{chapter_in_volume}-{chapter_in_volume}" "审查报告/第{volume_num}卷第{chapter_in_volume}章审查报告.md"
 ```
 
-如存在任意 `blocking=true` 问题，必须使用 `AskUserQuestion` 询问用户：
+如存在任意 `blocking=true` 问题，必须通过 `AskUserQuestion`（Claude Code）或直接向用户提问（Codex）确认：
 - 立即修复
 - 仅保存报告，稍后处理
 

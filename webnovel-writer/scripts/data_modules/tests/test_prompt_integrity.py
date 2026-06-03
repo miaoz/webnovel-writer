@@ -334,6 +334,39 @@ def test_agents_point_codex_to_inline_protocols(agent_file: Path):
     assert "references/codex/agent-protocols.md" in text
 
 
+def test_agent_orchestration_skills_include_codex_inline_paths():
+    """Skills that call Claude agents must also give Codex inline protocol alternatives."""
+    expected_protocols = {
+        "webnovel-write": (
+            "context-agent inline protocol",
+            "reviewer inline protocol",
+            "data-agent inline protocol",
+        ),
+        "webnovel-review": ("reviewer inline protocol",),
+        "webnovel-amend": (
+            "reviewer inline protocol",
+            "data-agent inline protocol",
+        ),
+    }
+
+    for skill_name, protocol_names in expected_protocols.items():
+        text = _read_text(SKILLS_DIR / skill_name / "SKILL.md")
+        assert "Claude Code path" in text, f"{skill_name}: 缺少 Claude Code path 标记"
+        assert "Codex path" in text, f"{skill_name}: 缺少 Codex path 标记"
+        assert "../../references/codex/agent-protocols.md" in text, (
+            f"{skill_name}: 缺少 Codex protocol 文档引用"
+        )
+        for protocol_name in protocol_names:
+            assert protocol_name in text, f"{skill_name}: 缺少 {protocol_name}"
+
+
+@pytest.mark.parametrize("skill_file", SKILL_FILES, ids=lambda f: f.parent.name)
+def test_skills_do_not_hard_require_ask_user_question(skill_file: Path):
+    """Codex may ask the user directly; skills should not require Claude AskUserQuestion only."""
+    text = _read_text(skill_file)
+    assert "必须使用 `AskUserQuestion`" not in text
+
+
 def test_webnovel_write_skill_uses_explicit_agent_invocation_templates():
     """webnovel-write 的关键 subagent 必须用显式 Agent(subagent_type=...) 调用模板。"""
     text = _read_text(SKILLS_DIR / "webnovel-write" / "SKILL.md")

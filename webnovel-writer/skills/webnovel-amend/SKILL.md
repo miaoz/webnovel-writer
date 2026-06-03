@@ -54,12 +54,18 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 必须调用 `reviewer`，保存结构化 JSON。
 
+#### Claude Code path
+
 ```text
 Agent(
   subagent_type: "webnovel-writer:reviewer",
   prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。这是已提交章节的人工修订复审，严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `reviewer inline protocol`。必须写出 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json` 后再运行下方 `review-pipeline`。
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \
@@ -76,12 +82,18 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" rev
 
 必须调用 `data-agent`，基于修订后的正文重新生成三份 JSON。
 
+#### Claude Code path
+
 ```text
 Agent(
   subagent_type: "webnovel-writer:data-agent",
   prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。这是人工修订后的重新入链：从当前正文提取事实，生成 .webnovel/tmp/fulfillment_result.json、disambiguation_result.json、extraction_result.json；fulfillment_result.json 必须顶层包含 planned_nodes/covered_nodes/missed_nodes/extra_nodes；disambiguation_result.json 必须顶层包含 pending；extraction_result.json 必须顶层包含 accepted_events/state_deltas/entity_deltas/entities_appeared/scenes/summary_text；accepted_events 子项必须包含 event_id/chapter/event_type/subject/payload；不直接写 state/index/summaries/memory。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `data-agent inline protocol`。必须写出 `${PROJECT_ROOT}/.webnovel/tmp/fulfillment_result.json`、`${PROJECT_ROOT}/.webnovel/tmp/disambiguation_result.json`、`${PROJECT_ROOT}/.webnovel/tmp/extraction_result.json` 后再覆盖 CHAPTER_COMMIT。
 
 ### Step 4：覆盖 CHAPTER_COMMIT 并刷新投影
 
