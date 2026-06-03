@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import importlib
 import sys
 from pathlib import Path
 
@@ -16,8 +17,19 @@ def _ensure_scripts_on_path() -> None:
 @pytest.fixture(autouse=True)
 def isolate_project_locator_environment(monkeypatch, tmp_path):
     monkeypatch.delenv("WEBNOVEL_PROJECT_ROOT", raising=False)
+    monkeypatch.delenv("WEBNOVEL_WORKSPACE_ROOT", raising=False)
+    monkeypatch.delenv("CODEX_WORKSPACE_ROOT", raising=False)
     monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("WEBNOVEL_HOME", raising=False)
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    monkeypatch.delenv("CLAUDE_HOME", raising=False)
     monkeypatch.setenv("WEBNOVEL_CLAUDE_HOME", str(tmp_path / "empty-claude-home"))
+
+
+def _make_project(root: Path) -> Path:
+    (root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    return root
 
 
 def test_resolve_project_root_prefers_cwd_project(tmp_path):
@@ -130,3 +142,97 @@ def test_resolve_project_root_ignores_stale_pointer_and_fallbacks(tmp_path):
     resolved = resolve_project_root(cwd=workspace)
     assert resolved == default_project.resolve()
 
+
+def test_resolve_project_root_uses_codex_workspace_root_env(monkeypatch, tmp_path):
+    _ensure_scripts_on_path()
+
+    from project_locator import resolve_project_root
+
+    workspace = tmp_path / "workspace"
+    (workspace / ".git").mkdir(parents=True, exist_ok=True)
+    project_root = _make_project(workspace / "凡人资本论")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("CODEX_WORKSPACE_ROOT", str(workspace))
+
+    resolved = resolve_project_root(cwd=elsewhere)
+    assert resolved == project_root.resolve()
+
+
+def test_resolve_project_root_webnovel_workspace_precedes_codex_root_env(monkeypatch, tmp_path):
+    _ensure_scripts_on_path()
+
+    from project_locator import resolve_project_root
+
+    codex_workspace = tmp_path / "codex-workspace"
+    webnovel_workspace = tmp_path / "webnovel-workspace"
+    codex_project = _make_project(codex_workspace / "Codex书")
+    webnovel_project = _make_project(webnovel_workspace / "Webnovel书")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("CODEX_WORKSPACE_ROOT", str(codex_workspace))
+    monkeypatch.setenv("WEBNOVEL_WORKSPACE_ROOT", str(webnovel_workspace))
+
+    resolved = resolve_project_root(cwd=elsewhere)
+    assert resolved == webnovel_project.resolve()
+    assert resolved != codex_project.resolve()
+
+
+def test_resolve_project_root_uses_claude_project_dir_env(monkeypatch, tmp_path):
+    _ensure_scripts_on_path()
+
+    from project_locator import resolve_project_root
+
+    workspace = tmp_path / "claude-workspace"
+    project_root = _make_project(workspace / "Claude书")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(workspace))
+
+    resolved = resolve_project_root(cwd=elsewhere)
+    assert resolved == project_root.resolve()
+
+
+def test_project_locator_user_home_prefers_webnovel_home_over_codex_home(monkeypatch, tmp_path):
+    _ensure_scripts_on_path()
+
+    from project_locator import _get_user_claude_root
+
+    webnovel_home = tmp_path / "webnovel-home"
+    codex_home = tmp_path / "codex-home"
+
+    monkeypatch.delenv("WEBNOVEL_CLAUDE_HOME", raising=False)
+    monkeypatch.setenv("WEBNOVEL_HOME", str(webnovel_home))
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    assert _get_user_claude_root() == webnovel_home.resolve()
+
+
+def test_project_locator_user_home_accepts_codex_home(monkeypatch, tmp_path):
+    _ensure_scripts_on_path()
+
+    from project_locator import _get_user_claude_root
+
+    codex_home = tmp_path / "codex-home"
+
+    monkeypatch.delenv("WEBNOVEL_CLAUDE_HOME", raising=False)
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    assert _get_user_claude_root() == codex_home.resolve()
+
+
+def test_data_modules_config_user_home_accepts_codex_home(monkeypatch, tmp_path):
+    _ensure_scripts_on_path()
+
+    codex_home = tmp_path / "codex-home"
+
+    monkeypatch.delenv("WEBNOVEL_CLAUDE_HOME", raising=False)
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    import data_modules.config as config_module
+
+    config_module = importlib.reload(config_module)
+    assert config_module._get_user_claude_root() == codex_home.resolve()

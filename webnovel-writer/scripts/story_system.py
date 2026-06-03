@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,10 @@ from data_modules.story_contracts import persist_runtime_contracts, persist_stor
 from data_modules.story_system_engine import StorySystemEngine, StorySystemRoutingError, is_placeholder_query
 from chapter_paths import global_from_volume_chapter
 from chapter_outline_loader import load_chapter_execution_directive
+
+
+_ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
 
 def _default_csv_dir() -> Path:
@@ -69,6 +74,17 @@ def _state_genre(project_root: Path) -> str:
     return ""
 
 
+def _genre_from_args_or_state(raw_genre: str, project_root: Path) -> str:
+    genre = str(raw_genre or "").strip()
+    if genre:
+        return genre
+
+    state_genre = _state_genre(project_root)
+    if _ASCII_LETTER_RE.search(state_genre) and not _CJK_RE.search(state_genre):
+        return ""
+    return state_genre
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Story system seed generator")
     parser.add_argument("query", help="题材 / 需求描述")
@@ -103,7 +119,7 @@ def main() -> None:
         else {}
     )
     engine = StorySystemEngine(csv_dir=csv_dir)
-    genre = str(args.genre or "").strip() or _state_genre(project_root)
+    genre = _genre_from_args_or_state(args.genre, project_root)
     try:
         contract = engine.build(
             query=args.query,

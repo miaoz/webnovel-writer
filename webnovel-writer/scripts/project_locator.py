@@ -28,10 +28,14 @@ CURRENT_PROJECT_POINTER_REL: Path = Path(".claude") / ".webnovel-current-project
 # 该文件用于在“空上下文 + CWD 不在项目内”的情况下仍能定位到正确 project_root。
 GLOBAL_REGISTRY_REL: Path = Path("webnovel-writer") / "workspaces.json"
 
-# Claude Code 常见环境变量（存在时优先作为“工作区根目录”提示）
+# Runtime workspace/home hints. WEBNOVEL_* is runtime-neutral, then Codex, then Claude.
+ENV_WEBNOVEL_WORKSPACE_ROOT = "WEBNOVEL_WORKSPACE_ROOT"
+ENV_CODEX_WORKSPACE_ROOT = "CODEX_WORKSPACE_ROOT"
 ENV_CLAUDE_PROJECT_DIR = "CLAUDE_PROJECT_DIR"
+ENV_WEBNOVEL_HOME = "WEBNOVEL_HOME"
 ENV_CLAUDE_HOME = "CLAUDE_HOME"
 ENV_WEBNOVEL_CLAUDE_HOME = "WEBNOVEL_CLAUDE_HOME"
+ENV_CODEX_HOME = "CODEX_HOME"
 
 
 def _find_git_root(cwd: Path) -> Optional[Path]:
@@ -59,13 +63,36 @@ def _normcase_path_key(p: Path) -> str:
     return os.path.normcase(str(resolved))
 
 
+def _env_path(name: str) -> Optional[Path]:
+    raw = os.environ.get(name)
+    if not raw or not raw.strip():
+        return None
+    return normalize_windows_path(raw.strip()).expanduser()
+
+
+def _workspace_hints_from_env() -> list[Path]:
+    hints: list[Path] = []
+    for name in (ENV_WEBNOVEL_WORKSPACE_ROOT, ENV_CODEX_WORKSPACE_ROOT, ENV_CLAUDE_PROJECT_DIR):
+        p = _env_path(name)
+        if p is not None:
+            hints.append(p)
+    return hints
+
+
+def _workspace_hint_from_env() -> Optional[Path]:
+    hints = _workspace_hints_from_env()
+    return hints[0] if hints else None
+
+
 def _get_user_claude_root() -> Path:
-    raw = os.environ.get(ENV_WEBNOVEL_CLAUDE_HOME) or os.environ.get(ENV_CLAUDE_HOME)
-    if raw:
+    for name in (ENV_WEBNOVEL_HOME, ENV_WEBNOVEL_CLAUDE_HOME, ENV_CODEX_HOME, ENV_CLAUDE_HOME):
+        raw = os.environ.get(name)
+        if not raw or not raw.strip():
+            continue
         try:
-            return normalize_windows_path(raw).expanduser().resolve()
+            return normalize_windows_path(raw.strip()).expanduser().resolve()
         except Exception:
-            return normalize_windows_path(raw).expanduser()
+            return normalize_windows_path(raw.strip()).expanduser()
     return (Path.home() / ".claude").resolve()
 
 
@@ -125,7 +152,7 @@ def _resolve_project_root_from_global_registry(
     从用户级 registry 中解析 project_root。
 
     安全策略：
-    - 优先使用 workspace_hint / CLAUDE_PROJECT_DIR 提示做匹配。
+    - 优先使用 workspace_hint / runtime workspace env 提示做匹配。
     - 默认不使用 last_used 兜底，避免在“完全无上下文”时误命中错误项目。
     """
     reg_path = _global_registry_path()
@@ -135,9 +162,7 @@ def _resolve_project_root_from_global_registry(
         return None
 
     hints: list[Path] = []
-    env_ws = os.environ.get(ENV_CLAUDE_PROJECT_DIR)
-    if env_ws:
-        hints.append(normalize_windows_path(env_ws).expanduser())
+    hints.extend(_workspace_hints_from_env())
     if workspace_hint is not None:
         hints.append(workspace_hint)
     hints.append(base)
@@ -208,9 +233,7 @@ def update_global_registry_current_project(
 
     ws = workspace_root
     if ws is None:
-        env_ws = os.environ.get(ENV_CLAUDE_PROJECT_DIR)
-        if env_ws:
-            ws = normalize_windows_path(env_ws).expanduser()
+        ws = _workspace_hint_from_env()
     if ws is None:
         return None
 
@@ -396,7 +419,8 @@ def resolve_project_root(explicit_project_root: Optional[str] = None, *, cwd: Op
             return root
         raise FileNotFoundError(f"WEBNOVEL_PROJECT_ROOT is set but invalid (missing .webnovel/state.json): {root}")
 
-    base = (cwd or Path.cwd()).resolve()
+    workspace_hint = _workspace_hint_from_env()
+    base = workspace_hint.resolve() if workspace_hint is not None else (cwd or Path.cwd()).resolve()
     git_root = _find_git_root(base)
 
     # Workspace pointer fallback (for layouts where `.claude` is in workspace root and projects are subdirs).
@@ -404,13 +428,17 @@ def resolve_project_root(explicit_project_root: Optional[str] = None, *, cwd: Op
     if pointer_root is not None:
         return pointer_root
 
+    child_root = _resolve_unique_child_project_root(base)
+    if child_root is not None:
+        return child_root
+
     # 用户级 registry fallback（仅在“有上下文提示”时启用，避免误命中）
-    # - 若 CLAUDE_PROJECT_DIR 存在：认为 Claude Code 提供了工作区上下文
+    # - 若 runtime workspace env 存在：认为工具提供了工作区上下文
     # - 否则仅在 base 位于某个已记录 workspace 内时启用（前缀匹配）
-    allow_last_used = bool(os.environ.get(ENV_CLAUDE_PROJECT_DIR))
+    allow_last_used = workspace_hint is not None
     reg_root = _resolve_project_root_from_global_registry(
         base,
-        workspace_hint=None,
+        workspace_hint=workspace_hint,
         allow_last_used_fallback=allow_last_used,
     )
     if reg_root is not None:
@@ -423,7 +451,7 @@ def resolve_project_root(explicit_project_root: Optional[str] = None, *, cwd: Op
     raise FileNotFoundError(
         "Unable to locate webnovel project root. Expected `.webnovel/state.json` under the current directory, "
         "a parent directory, or `webnovel-project/`. Run /webnovel-init first or pass --project-root / set "
-        "WEBNOVEL_PROJECT_ROOT."
+        "WEBNOVEL_PROJECT_ROOT / WEBNOVEL_WORKSPACE_ROOT / CODEX_WORKSPACE_ROOT."
     )
 
 
@@ -446,4 +474,3 @@ def resolve_state_file(
 
     root = resolve_project_root(explicit_project_root, cwd=base)
     return root / ".webnovel" / "state.json"
-

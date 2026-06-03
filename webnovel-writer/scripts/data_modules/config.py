@@ -18,12 +18,14 @@ from runtime_compat import normalize_windows_path
 from .context_weights import TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT
 
 def _get_user_claude_root() -> Path:
-    raw = os.environ.get("WEBNOVEL_CLAUDE_HOME") or os.environ.get("CLAUDE_HOME")
-    if raw:
+    for name in ("WEBNOVEL_HOME", "WEBNOVEL_CLAUDE_HOME", "CODEX_HOME", "CLAUDE_HOME"):
+        raw = os.environ.get(name)
+        if not raw or not raw.strip():
+            continue
         try:
-            return normalize_windows_path(raw).expanduser().resolve()
+            return normalize_windows_path(raw.strip()).expanduser().resolve()
         except Exception:
-            return normalize_windows_path(raw).expanduser()
+            return normalize_windows_path(raw.strip()).expanduser()
     return (Path.home() / ".claude").resolve()
 
 
