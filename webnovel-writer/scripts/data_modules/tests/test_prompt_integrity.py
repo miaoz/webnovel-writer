@@ -367,6 +367,21 @@ def test_skills_do_not_hard_require_ask_user_question(skill_file: Path):
     assert "必须使用 `AskUserQuestion`" not in text
 
 
+def test_webnovel_init_has_codex_compatible_interaction_path():
+    """webnovel-init should describe capabilities, not require Claude-only tools."""
+    text = _read_text(SKILLS_DIR / "webnovel-init" / "SKILL.md")
+
+    assert "use web search if available and required by time-sensitive market claims" in text
+    assert "ask the user directly for unresolved decisions" in text
+    assert "Codex: use the inline deconstruction protocol when subagents are unavailable" in text
+    assert "Claude Code path" in text
+    assert "Codex path" in text
+    assert "../../references/codex/agent-protocols.md" in text
+    assert "deconstruction-agent inline protocol" in text
+    assert 'subagent_type: "webnovel-writer:deconstruction-agent"' in text
+    assert "允许调用 `Read/Grep/Bash/Agent/AskUserQuestion/WebSearch/WebFetch`" not in text
+
+
 def test_webnovel_write_skill_uses_explicit_agent_invocation_templates():
     """webnovel-write 的关键 subagent 必须用显式 Agent(subagent_type=...) 调用模板。"""
     text = _read_text(SKILLS_DIR / "webnovel-write" / "SKILL.md")

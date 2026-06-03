@@ -16,7 +16,7 @@ allowed-tools: Read Write Edit Grep Bash Agent AskUserQuestion WebSearch WebFetc
 
 1. 先收集，再生成；未过充分性闸门，不执行 `init_project.py`。
 2. 分波次提问，每轮只问"当前缺失且会阻塞下一步"的信息。
-3. 允许调用 `Read/Grep/Bash/Agent/AskUserQuestion/WebSearch/WebFetch` 辅助收集。
+3. 使用可用能力辅助收集：读取/检索/命令执行/子任务协议/直接提问/必要时网页检索。
 4. 用户已明确的信息不重复问；冲突信息优先让用户裁决。
 5. Deep 模式优先完整性，允许慢一点，但禁止漏关键字段。
 6. 参考书拆解只返回结构化结果给 init 主流程；用户确认前不得写入 `idea_bank.json`、`.story-system`、`设定集`、`大纲`、`正文`、`.webnovel/state.json` 或任何 canon/read model 文件。
@@ -54,14 +54,14 @@ allowed-tools: Read Write Edit Grep Bash Agent AskUserQuestion WebSearch WebFetc
 |------|---------|---------|
 | 角色/书名/势力设定 | 用户开始设定命名 | `python -X utf8 "${SCRIPTS_DIR}/reference_search.py" --skill init --table 命名规则 --query "{命名对象} {题材}" --genre {题材}` |
 
-## 工具策略（按需）
+## 能力策略（按需）
 
-- `Read/Grep`：读取项目上下文与参考文件（`README.md`、`CLAUDE.md`、`templates/genres/*`、`references/*`）。
-- `Bash`：执行 `init_project.py`、文件存在性检查、最小验证命令。
-- `Agent`：拆分并行子任务（如题材映射、约束包候选生成、文件验证）；Step 1.5 用户选择参考书拆解作为灵感来源时，调用 `webnovel-writer:deconstruction-agent`。
-- `AskUserQuestion`：用于关键分歧裁决、候选方案选择、最终确认。
-- `WebSearch`：用于检索最新市场趋势、平台风向、题材数据（可带域名过滤）。
-- `WebFetch`：用于抓取已确定来源页面内容并做事实核验。
+- 读取/检索：读取项目上下文与参考文件（`README.md`、`CLAUDE.md`、`templates/genres/*`、`references/*`）。
+- 命令执行：执行 `init_project.py`、文件存在性检查、最小验证命令。
+- 子任务协议：Claude Code 可用 `Agent` 拆分题材映射、约束包候选生成、文件验证；Codex: use the inline deconstruction protocol when subagents are unavailable。
+- 用户裁决：ask the user directly for unresolved decisions；Claude Code 可用 `AskUserQuestion`，Codex 直接向用户提问。
+- 网页检索：use web search if available and required by time-sensitive market claims；仅用于最新市场趋势、平台风向、题材数据或用户明确要求的事实核验。
+- 网页抓取：仅在已确定来源页面需要事实核验时使用。
 - 外部检索触发条件：
   - 用户明确要求参考市场趋势或平台风向；
   - 创意约束需要"时间敏感依据"；
@@ -116,7 +116,11 @@ export SCRIPTS_DIR="${WEBNOVEL_PLUGIN_ROOT}/scripts"
 - 市场趋势或平台风向；
 - 题材模板、反套路库、已有脑洞片段。
 
-当用户选择参考作品拆书且提供文本路径或章节摘录时，必须使用 `Agent` 工具调用 `webnovel-writer:deconstruction-agent`，不得由 init 主流程口头替代拆解结果。
+当用户选择参考作品拆书且提供文本路径或章节摘录时，必须使用拆解协议，不得由 init 主流程口头替代拆解结果。
+
+#### Claude Code path
+
+使用 `Agent` 工具调用 `webnovel-writer:deconstruction-agent`。
 
 ```text
 Agent(
@@ -124,6 +128,10 @@ Agent(
   prompt: "reference_title={reference_title}; reference_source={reference_source}; reference_text_path={reference_text_path}; reference_text_excerpt={reference_text_excerpt}; analysis_mode={quick|deep|auto}; init_goal={当前初始化故事方向或空}; target_genre={题材或空}。只返回 init_reference_research JSON 对象，不写任何文件，不创建目录，不写 .story-system、.webnovel、设定集、大纲、正文、idea_bank.json、state.json 或任何 canon/read model 文件。"
 )
 ```
+
+#### Codex path
+
+读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `deconstruction-agent inline protocol`。返回同样的 `init_reference_research` JSON 对象；不写任何文件，不创建目录，不写 `.story-system`、`.webnovel`、`设定集`、`大纲`、`正文`、`idea_bank.json`、`state.json` 或任何 canon/read model 文件。
 
 处理规则：
 - 如果用户只有书名/平台，没有文本或摘录，先询问是否能提供摘录/路径；若不能提供，则把参考书仅作为"方向线索"，不得编造该书黄金三章、角色、设定或剧情事实。
