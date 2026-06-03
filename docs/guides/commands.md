@@ -1,6 +1,8 @@
 # 命令详解
 
-## Skill 命令（在 Claude Code 中使用）
+## Skill 命令（在 Claude Code 或 Codex 中使用）
+
+Claude Code 通过 `CLAUDE_PLUGIN_ROOT` 自动提供插件根目录；Codex 建议显式设置 `WEBNOVEL_PLUGIN_ROOT`。所有示例统一使用 `WEBNOVEL_PLUGIN_ROOT`，它应指向包含 `scripts/`、`skills/`、`references/` 的插件目录。
 
 ### `/webnovel-init`
 
@@ -86,8 +88,17 @@
 所有 CLI 命令的入口都是 `webnovel.py`，格式：
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" <子命令> [参数]
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" <子命令> [参数]
 ```
+
+运行时路径约定：
+
+```bash
+export WORKSPACE_ROOT="${WEBNOVEL_WORKSPACE_ROOT:-${CODEX_WORKSPACE_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}}"
+export WEBNOVEL_PLUGIN_ROOT="${WEBNOVEL_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-<resolved-plugin-root>}}"
+```
+
+Codex 中 `/webnovel-write`、`/webnovel-review`、`/webnovel-amend` 默认按 `../../references/codex/agent-protocols.md` 在当前会话执行 inline protocol，并生成与 Claude Agent 相同的 JSON artifacts。
 
 ## Story System 主链
 
@@ -96,13 +107,13 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 1. 生成合同
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --chapter 12 --persist --emit-runtime-contracts --format both
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --chapter 12 --persist --emit-runtime-contracts --format both
 ```
 
 2. 提交章节
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit \
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit \
   --chapter 12 \
   --review-result ".webnovel/tmp/review_results.json" \
   --fulfillment-result ".webnovel/tmp/fulfillment_result.json" \
@@ -113,7 +124,7 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 3. 检查主链健康
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" preflight --format json
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" preflight --format json
 ```
 
 其中 `.story-system/` 是主链真源，`.webnovel/*` 是投影/read-model。
@@ -162,8 +173,8 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 示例：
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory stats
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory query --category character_state --subject xiaoyan
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory stats
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" memory query --category character_state --subject xiaoyan
 ```
 
 ### Story System 子命令
@@ -181,9 +192,9 @@ python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJE
 示例：
 
 ```bash
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --persist
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit --chapter 12 --review-result .webnovel/tmp/review.json
-python -X utf8 "<CLAUDE_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-events --health
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-system "玄幻退婚流" --persist
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" chapter-commit --chapter 12 --review-result .webnovel/tmp/review.json
+python -X utf8 "<WEBNOVEL_PLUGIN_ROOT>/scripts/webnovel.py" --project-root "<PROJECT_ROOT>" story-events --health
 ```
 
 产物：

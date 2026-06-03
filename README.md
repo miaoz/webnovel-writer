@@ -3,11 +3,12 @@
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Compatible-purple.svg)](https://claude.ai/claude-code)
+[![Codex](https://img.shields.io/badge/Codex-Compatible-green.svg)](webnovel-writer/.codex-plugin/plugin.json)
 
 <a href="https://trendshift.io/repositories/22487" target="_blank"><img src="https://trendshift.io/api/badge/repositories/22487" alt="lingfengQAQ%2Fwebnovel-writer | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 ## 这是什么？
 
-`Webnovel Writer` 是一个基于 Claude Code 的长篇网文创作系统。
+`Webnovel Writer` 是一个兼容 Claude Code 与 Codex 的长篇网文创作系统。
 
 它的目标很简单：**让 AI 在写长篇小说时不乱编、不忘事**。
 
@@ -27,6 +28,8 @@
 
 ### 1) 安装插件
 
+#### Claude Code
+
 通过 Claude Code 官方 Marketplace 安装：
 
 ```bash
@@ -36,6 +39,30 @@ claude plugin install webnovel-writer@webnovel-writer-marketplace --scope user
 
 > 如果只想在当前项目生效，把 `--scope user` 改成 `--scope project`。
 
+#### Codex
+
+本仓库已包含 Codex manifest：`webnovel-writer/.codex-plugin/plugin.json`。本地验证：
+
+```bash
+python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py webnovel-writer
+```
+
+如果你已经把本仓库加入某个 Codex marketplace，安装或重装：
+
+```bash
+codex plugin marketplace add <marketplace-root>
+codex plugin add webnovel-writer@<marketplace-name>
+```
+
+Codex 运行时建议显式设置：
+
+```bash
+export WEBNOVEL_WORKSPACE_ROOT="/path/to/your/workspace"
+export WEBNOVEL_PLUGIN_ROOT="/path/to/webnovel-writer/webnovel-writer"
+```
+
+`WEBNOVEL_PLUGIN_ROOT` 指向插件根目录，也就是包含 `scripts/`、`skills/`、`references/` 的目录。Claude Code 的 `CLAUDE_PLUGIN_ROOT` 仍作为 fallback 支持。
+
 ### 2) 安装 Python 依赖
 
 ```bash
@@ -44,7 +71,7 @@ python -m pip install -r https://raw.githubusercontent.com/lingfengQAQ/webnovel-
 
 ### 3) 初始化小说项目
 
-在 Claude Code 中输入：
+在 Claude Code 或 Codex 中输入：
 
 ```bash
 /webnovel-init
@@ -119,6 +146,8 @@ model: inherit
 model: sonnet  # 可选：inherit / sonnet / opus / haiku
 ---
 ```
+
+Codex 中的 `/webnovel-write`、`/webnovel-review`、`/webnovel-amend` 默认使用 `references/codex/agent-protocols.md` 中的单会话 inline protocol；如果当前 Codex 环境显式提供 subagent 能力，也可以按同一 artifact schema 拆分执行。
 
 ## 更新简介
 
