@@ -303,6 +303,37 @@ def test_active_skills_use_dual_runtime_path_convention():
         )
 
 
+def test_codex_agent_protocols_cover_required_artifacts():
+    """Codex inline protocols must preserve the same artifact contracts as Claude agents."""
+    protocol_path = REFERENCES_DIR / "codex" / "agent-protocols.md"
+    assert protocol_path.is_file(), "缺少 references/codex/agent-protocols.md"
+
+    text = _read_text(protocol_path)
+    for section in (
+        "context-agent inline protocol",
+        "reviewer inline protocol",
+        "data-agent inline protocol",
+        "deconstruction-agent inline protocol",
+    ):
+        assert section in text
+
+    for artifact in (
+        "review_results.json",
+        "fulfillment_result.json",
+        "disambiguation_result.json",
+        "extraction_result.json",
+    ):
+        assert artifact in text
+
+
+@pytest.mark.parametrize("agent_file", AGENT_FILES, ids=lambda f: f.name)
+def test_agents_point_codex_to_inline_protocols(agent_file: Path):
+    """Agent specs remain Claude Code specs, with Codex routed to inline protocols."""
+    text = _read_text(agent_file)
+    assert "Claude Code subagent spec" in text
+    assert "references/codex/agent-protocols.md" in text
+
+
 def test_webnovel_write_skill_uses_explicit_agent_invocation_templates():
     """webnovel-write 的关键 subagent 必须用显式 Agent(subagent_type=...) 调用模板。"""
     text = _read_text(SKILLS_DIR / "webnovel-write" / "SKILL.md")

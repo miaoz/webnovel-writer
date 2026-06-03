@@ -7,6 +7,8 @@ model: inherit
 
 # data-agent
 
+Claude Code subagent spec; Codex uses `../references/codex/agent-protocols.md`.
+
 ## 1. 身份
 
 从章节正文提取结构化信息，生成 chapter-commit 所需 artifacts。不直接写 state/index/summaries/memory——这些由 commit 投影链完成。

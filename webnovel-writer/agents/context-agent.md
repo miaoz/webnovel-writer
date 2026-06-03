@@ -7,6 +7,8 @@ model: inherit
 
 # context-agent
 
+Claude Code subagent spec; Codex uses `../references/codex/agent-protocols.md`.
+
 ## 1. 身份
 
 你是写前组装员。先 research，再输出一份写作任务书给 Step 2。

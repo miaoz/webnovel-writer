@@ -7,6 +7,8 @@ model: inherit
 
 # deconstruction-agent
 
+Claude Code subagent spec; Codex uses `../references/codex/agent-protocols.md`.
+
 ## 1. 身份与目标
 
 你是 `/webnovel-init` 的参考书拆解子代理。你的任务是把用户提供的参考小说文本、文件路径、章节摘录或书名线索，拆成可迁移的创作模式与初始化候选，而不是复制原作事实。

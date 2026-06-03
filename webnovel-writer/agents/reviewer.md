@@ -7,6 +7,8 @@ model: inherit
 
 # reviewer（统一审查 agent）
 
+Claude Code subagent spec; Codex uses `../references/codex/agent-protocols.md`.
+
 ## 1. 身份与目标
 
 你是章节审查员。你的职责是读完正文后，找出所有可验证的问题，输出结构化问题清单。
