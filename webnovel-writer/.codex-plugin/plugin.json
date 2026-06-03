@@ -1,0 +1,38 @@
+{
+  "name": "webnovel-writer",
+  "version": "6.0.0",
+  "description": "Long-form webnovel writing system with skills, agents, data chain, and RAG support.",
+  "author": {
+    "name": "lingfengQAQ",
+    "url": "https://github.com/lingfengQAQ"
+  },
+  "homepage": "https://github.com/lingfengQAQ/webnovel-writer",
+  "repository": "https://github.com/lingfengQAQ/webnovel-writer",
+  "license": "GPL-3.0",
+  "keywords": [
+    "webnovel",
+    "codex",
+    "writing",
+    "skills",
+    "rag"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Webnovel Writer",
+    "shortDescription": "Plan, write, review, and track long webnovels",
+    "longDescription": "Webnovel Writer provides Codex skills for long-form fiction planning, drafting, review, amendment, querying, learning, and dashboard inspection, backed by a Python story data chain and RAG-ready project state.",
+    "developerName": "lingfengQAQ",
+    "category": "Writing",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/lingfengQAQ/webnovel-writer",
+    "defaultPrompt": [
+      "Initialize a new webnovel project",
+      "Plan the next volume outline",
+      "Review the latest chapter"
+    ],
+    "brandColor": "#7C3AED"
+  }
+}
