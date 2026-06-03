@@ -12,10 +12,13 @@ allowed-tools: Read Bash
 - 使用统一入口解析项目根，避免写错目录：
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-export SCRIPTS_DIR="${CLAUDE_PLUGIN_ROOT:?}/scripts"
+export WORKSPACE_ROOT="${WEBNOVEL_WORKSPACE_ROOT:-${CODEX_WORKSPACE_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}}"
+export WEBNOVEL_PLUGIN_ROOT="${WEBNOVEL_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+export SCRIPTS_DIR="${WEBNOVEL_PLUGIN_ROOT}/scripts"
 export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 ```
+
+说明：script path must resolve to plugin `scripts/`；Codex 中如 `WEBNOVEL_PLUGIN_ROOT` 为空，先从当前加载的 `SKILL.md` 位置解析插件根目录（本 skill 为 `../..`），再使用 `../../scripts`。
 
 ## 目标
 - 提取可复用的写作模式（钩子/节奏/对话/微兑现等）

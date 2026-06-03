@@ -284,6 +284,25 @@ def test_active_skills_use_agent_tool_name_not_legacy_task():
         assert "必须通过 `Task`" not in text, f"{skill_file.parent.name}: 仍要求旧 Task 工具名"
 
 
+def test_active_skills_use_dual_runtime_path_convention():
+    """Active skills may keep Claude fallbacks, but must not require Claude-only path env."""
+    for skill_file in SKILL_FILES:
+        text = _read_text(skill_file)
+        skill_name = skill_file.parent.name
+
+        assert "WEBNOVEL_WORKSPACE_ROOT" in text, f"{skill_name}: 缺少 WEBNOVEL_WORKSPACE_ROOT fallback"
+        assert "CODEX_WORKSPACE_ROOT" in text, f"{skill_name}: 缺少 CODEX_WORKSPACE_ROOT fallback"
+        assert "WEBNOVEL_PLUGIN_ROOT" in text, f"{skill_name}: 缺少 WEBNOVEL_PLUGIN_ROOT fallback"
+        assert 'export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"' not in text, (
+            f"{skill_name}: 仍只使用 CLAUDE_PROJECT_DIR"
+        )
+        assert "${CLAUDE_PLUGIN_ROOT:?}" not in text, f"{skill_name}: 仍硬依赖 CLAUDE_PLUGIN_ROOT"
+        assert "固定路径：`${CLAUDE_PLUGIN_ROOT}/scripts`" not in text, f"{skill_name}: 仍声明 Claude 固定路径"
+        assert "script path must resolve to plugin `scripts/`" in text, (
+            f"{skill_name}: 缺少 Codex/Claude 共同的 scripts 目录解析说明"
+        )
+
+
 def test_webnovel_write_skill_uses_explicit_agent_invocation_templates():
     """webnovel-write 的关键 subagent 必须用显式 Agent(subagent_type=...) 调用模板。"""
     text = _read_text(SKILLS_DIR / "webnovel-write" / "SKILL.md")

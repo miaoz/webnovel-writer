@@ -73,19 +73,22 @@ allowed-tools: Read Write Edit Grep Bash Agent AskUserQuestion WebSearch WebFetc
 
 环境设置（bash 命令执行前）：
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
+export WORKSPACE_ROOT="${WEBNOVEL_WORKSPACE_ROOT:-${CODEX_WORKSPACE_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}}"
+export WEBNOVEL_PLUGIN_ROOT="${WEBNOVEL_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
 
-if [ -z "${CLAUDE_PLUGIN_ROOT}" ] || [ ! -d "${CLAUDE_PLUGIN_ROOT}/scripts" ]; then
-  echo "ERROR: 未设置 CLAUDE_PLUGIN_ROOT 或缺少目录: ${CLAUDE_PLUGIN_ROOT}/scripts" >&2
+if [ -z "${WEBNOVEL_PLUGIN_ROOT}" ] || [ ! -d "${WEBNOVEL_PLUGIN_ROOT}/scripts" ]; then
+  echo "ERROR: 未设置 WEBNOVEL_PLUGIN_ROOT 或缺少目录: ${WEBNOVEL_PLUGIN_ROOT}/scripts" >&2
   exit 1
 fi
-export SCRIPTS_DIR="${CLAUDE_PLUGIN_ROOT}/scripts"
+export SCRIPTS_DIR="${WEBNOVEL_PLUGIN_ROOT}/scripts"
 ```
+
+说明：script path must resolve to plugin `scripts/`；Codex 中如 `WEBNOVEL_PLUGIN_ROOT` 为空，先从当前加载的 `SKILL.md` 位置解析插件根目录（本 skill 为 `../..`），再使用 `../../scripts`。
 
 必须做：
 - 确认当前目录可写。
-- 解析脚本目录并确认入口存在（仅支持插件目录）：
-  - 固定路径：`${CLAUDE_PLUGIN_ROOT}/scripts`
+- 解析脚本目录并确认入口存在（仅支持插件目录；Claude 可通过 `CLAUDE_PLUGIN_ROOT` fallback）：
+  - 脚本目录必须解析到插件 `scripts/`
   - 入口脚本：`${SCRIPTS_DIR}/webnovel.py`
 - 初始化前不要用 `where` 把 `WORKSPACE_ROOT` 解析成书项目根；新项目尚不存在时，`where` 可能命中旧指针或旧项目。
 - 只打印工作区与脚本目录，确认生成目标将在工作区下的书名安全化子目录中。
@@ -307,7 +310,7 @@ Agent(
 - `project_root` 必须由书名安全化生成（去非法字符，空格转 `-`）。
 - 构造公式：`project_root = <当前工作目录>/<书名安全化结果>`，即 `PROJECT_ROOT="${WORKSPACE_ROOT}/${PROJECT_SLUG}"`。
 - 若安全化结果为空或以 `.` 开头，自动前缀 `proj-`。
-- 禁止在插件目录下生成项目文件（`${CLAUDE_PLUGIN_ROOT}`）。
+- 禁止在插件目录下生成项目文件（`${WEBNOVEL_PLUGIN_ROOT}`）。
 - 禁止直接把 `WORKSPACE_ROOT` 当作 `PROJECT_ROOT`，除非用户明确指定当前目录本身就是书项目根。
 - 初始化前必须展示并确认：
   - `WORKSPACE_ROOT`

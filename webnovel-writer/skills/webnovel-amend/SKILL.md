@@ -27,14 +27,17 @@ allowed-tools: Read Grep Write Edit Bash Agent AskUserQuestion
 ### Step 1：定位项目与写前主链
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-export SCRIPTS_DIR="${CLAUDE_PLUGIN_ROOT:?}/scripts"
+export WORKSPACE_ROOT="${WEBNOVEL_WORKSPACE_ROOT:-${CODEX_WORKSPACE_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}}"
+export WEBNOVEL_PLUGIN_ROOT="${WEBNOVEL_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+export SCRIPTS_DIR="${WEBNOVEL_PLUGIN_ROOT}/scripts"
 export PROJECT_ROOT="$(python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" preflight
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
   prewrite-check --volume {volume_num} --chapter {chapter_in_volume} --rewrite
 ```
+
+说明：script path must resolve to plugin `scripts/`；Codex 中如 `WEBNOVEL_PLUGIN_ROOT` 为空，先从当前加载的 `SKILL.md` 位置解析插件根目录（本 skill 为 `../..`），再使用 `../../scripts`。
 
 若 `ready=false`，先修复 blocking_reasons。缺 runtime 合同时，从详细大纲解析真实 `CHAPTER_GOAL` 后补齐：
 

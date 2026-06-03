@@ -13,14 +13,17 @@ allowed-tools: Read Grep Bash AskUserQuestion
 ## 项目根保护
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-export SCRIPTS_DIR="${CLAUDE_PLUGIN_ROOT}/scripts"
-export SKILL_ROOT="${CLAUDE_PLUGIN_ROOT}/skills/webnovel-query"
+export WORKSPACE_ROOT="${WEBNOVEL_WORKSPACE_ROOT:-${CODEX_WORKSPACE_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}}"
+export WEBNOVEL_PLUGIN_ROOT="${WEBNOVEL_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+export SCRIPTS_DIR="${WEBNOVEL_PLUGIN_ROOT}/scripts"
+export SKILL_ROOT="${WEBNOVEL_PLUGIN_ROOT}/skills/webnovel-query"
 export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 ```
 
+说明：script path must resolve to plugin `scripts/`；Codex 中如 `WEBNOVEL_PLUGIN_ROOT` 为空，先从当前加载的 `SKILL.md` 位置解析插件根目录（本 skill 为 `../..`），再使用 `../../scripts`。
+
 - `PROJECT_ROOT` 必须包含 `.webnovel/state.json`
-- **禁止**在 `${CLAUDE_PLUGIN_ROOT}/` 下读取或写入项目文件
+- **禁止**在 `${WEBNOVEL_PLUGIN_ROOT}/` 下读取或写入项目文件
 
 ## 查询类型识别
 

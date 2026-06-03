@@ -18,21 +18,24 @@ allowed-tools: Bash Read
 ### Step 1：确认环境与模块目录
 
 ```bash
-export WORKSPACE_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
+export WORKSPACE_ROOT="${WEBNOVEL_WORKSPACE_ROOT:-${CODEX_WORKSPACE_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}}"
+export WEBNOVEL_PLUGIN_ROOT="${WEBNOVEL_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
 
-if [ -z "${CLAUDE_PLUGIN_ROOT}" ] || [ ! -d "${CLAUDE_PLUGIN_ROOT}/dashboard" ]; then
-  echo "ERROR: 未找到 dashboard 模块: ${CLAUDE_PLUGIN_ROOT}/dashboard" >&2
+if [ -z "${WEBNOVEL_PLUGIN_ROOT}" ] || [ ! -d "${WEBNOVEL_PLUGIN_ROOT}/dashboard" ]; then
+  echo "ERROR: 未找到 dashboard 模块: ${WEBNOVEL_PLUGIN_ROOT}/dashboard" >&2
   exit 1
 fi
 
-export DASHBOARD_DIR="${CLAUDE_PLUGIN_ROOT}/dashboard"
+export DASHBOARD_DIR="${WEBNOVEL_PLUGIN_ROOT}/dashboard"
 ```
+
+说明：script path must resolve to plugin `scripts/`；Codex 中如 `WEBNOVEL_PLUGIN_ROOT` 为空，先从当前加载的 `SKILL.md` 位置解析插件根目录（本 skill 为 `../..`），再使用 `../../scripts`。
 
 ### Step 2：安装依赖并解析项目根目录
 
 ```bash
 python -m pip install -r "${DASHBOARD_DIR}/requirements.txt" --quiet
-export SCRIPTS_DIR="${CLAUDE_PLUGIN_ROOT}/scripts"
+export SCRIPTS_DIR="${WEBNOVEL_PLUGIN_ROOT}/scripts"
 export PROJECT_ROOT="$(python "${SCRIPTS_DIR}/webnovel.py" --project-root "${WORKSPACE_ROOT}" where)"
 echo "项目路径: ${PROJECT_ROOT}"
 ```
@@ -45,9 +48,9 @@ echo "项目路径: ${PROJECT_ROOT}"
 
 ```bash
 if [ -n "${PYTHONPATH:-}" ]; then
-  export PYTHONPATH="${CLAUDE_PLUGIN_ROOT}:${PYTHONPATH}"
+  export PYTHONPATH="${WEBNOVEL_PLUGIN_ROOT}:${PYTHONPATH}"
 else
-  export PYTHONPATH="${CLAUDE_PLUGIN_ROOT}"
+  export PYTHONPATH="${WEBNOVEL_PLUGIN_ROOT}"
 fi
 
 if [ ! -f "${DASHBOARD_DIR}/frontend/dist/index.html" ]; then
