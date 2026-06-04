@@ -11,6 +11,7 @@
 
 ### 使用指南
 
+- [`guides/codex-compatibility.md`](./guides/codex-compatibility.md)：Claude Code / Codex 兼容版安装与运行说明
 - [`guides/commands.md`](./guides/commands.md)：Skill 命令与 CLI 子命令速查
 - [`guides/rag-and-config.md`](./guides/rag-and-config.md)：RAG 检索链路、环境变量与配置
 - [`guides/genres.md`](./guides/genres.md)：37 个题材模板与复合题材规则
