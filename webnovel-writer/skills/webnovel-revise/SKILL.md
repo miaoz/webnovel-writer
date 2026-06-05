@@ -177,13 +177,13 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 ```text
 Agent(
   subagent_type: "webnovel-writer:reviewer",
-  prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。这是按用户修订意见完成后的受控复审，严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。重点检查：是否遵守更新后的章纲/合同、是否仍有旧事实残留、是否引入未确认事实、是否破坏文风。"
+  prompt: "volume={volume_num} chapter={chapter_in_volume}; chapter_file=${CHAPTER_FILE}; project_root=${PROJECT_ROOT}; scripts_dir=${SCRIPTS_DIR}。这是按用户修订意见完成后的受控复审，严格输出 reviewer schema JSON，并保存到 ${PROJECT_ROOT}/.webnovel/tmp/review_results.json。重点检查：是否遵守更新后的章纲/合同、是否仍有旧事实残留、是否引入未确认事实、是否违反 polish-guide.md 中的文风约束。"
 )
 ```
 
 #### Codex path
 
-读取 `../../references/codex/agent-protocols.md`，在当前会话执行 `reviewer inline protocol`。必须写出 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json` 后再运行下方 `review-pipeline`。
+读取 `../../references/codex/agent-protocols.md` 与 `../webnovel-write/references/polish-guide.md`，在当前会话执行 `reviewer inline protocol`。必须写出 `${PROJECT_ROOT}/.webnovel/tmp/review_results.json` 后再运行下方 `review-pipeline`。
 
 ```bash
 python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" review-pipeline \

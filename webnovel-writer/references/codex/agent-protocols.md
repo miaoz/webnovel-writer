@@ -58,6 +58,7 @@ Inputs:
 - `volume`
 - `chapter`
 - `chapter_file`
+- `webnovel-writer/skills/webnovel-write/references/polish-guide.md` when checking style constraints
 - optional project style or anti-AI rules
 
 Required reads:
@@ -66,6 +67,7 @@ Required reads:
 - `.story-system/reviews/chapter_{global_chapter:03d}.review.json`
 - latest accepted `.story-system/commits/chapter_*.commit.json`
 - relevant state/index lookups through `webnovel.py` when checking entities, timeline, relationships, or recent changes
+- `webnovel-writer/skills/webnovel-write/references/polish-guide.md` when checking `ai_flavor`
 - project-specific style rules if the user provides them
 
 Required JSON artifact:
