@@ -81,6 +81,7 @@ Claude Code 与 Codex 都使用同一组 skill：
 /webnovel-plan 1
 /webnovel-write 1
 /webnovel-review 1-5
+/webnovel-revise 3
 /webnovel-amend 3
 /webnovel-query 伏笔
 /webnovel-dashboard
@@ -105,6 +106,7 @@ Claude Code 路径：
 
 - `webnovel-write` 调用 `context-agent`、`reviewer`、`data-agent`
 - `webnovel-review` 调用 `reviewer`
+- `webnovel-revise` 调用 `reviewer`、`data-agent`
 - `webnovel-amend` 调用 `reviewer`、`data-agent`
 - `webnovel-init` 可调用 `deconstruction-agent`
 

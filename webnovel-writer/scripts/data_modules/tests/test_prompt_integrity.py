@@ -347,6 +347,10 @@ def test_agent_orchestration_skills_include_codex_inline_paths():
             "reviewer inline protocol",
             "data-agent inline protocol",
         ),
+        "webnovel-revise": (
+            "reviewer inline protocol",
+            "data-agent inline protocol",
+        ),
     }
 
     for skill_name, protocol_names in expected_protocols.items():
@@ -480,6 +484,25 @@ def test_webnovel_amend_reruns_review_extraction_and_commit():
     assert "chapter-commit" in text
     assert "--commit-mode native_write" in text
     assert "projection_status" in text
+
+
+def test_webnovel_revise_enforces_outline_first_for_fact_changes():
+    text = (SKILLS_DIR / "webnovel-revise" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "事实型修订必须大纲先行" in text
+    assert "阻断正文修改" in text
+    assert "大纲修订提案" in text
+    assert "用户确认" in text
+    assert "story-system" in text
+    assert "--emit-runtime-contracts" in text
+    assert "prewrite-check" in text
+    assert "--rewrite" in text
+    assert 'subagent_type: "webnovel-writer:reviewer"' in text
+    assert 'subagent_type: "webnovel-writer:data-agent"' in text
+    assert "review-pipeline" in text
+    assert "chapter-commit" in text
+    assert "--commit-mode native_write" in text
+    assert "story-repair audit" in text
 
 
 def test_dashboard_and_plan_skills_surface_story_runtime_mainline():

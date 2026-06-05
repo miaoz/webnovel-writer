@@ -105,6 +105,7 @@ RERANK_API_KEY=your_rerank_api_key
 /webnovel-plan 1      # 规划第 1 卷大纲
 /webnovel-write 1     # 写第 1 章
 /webnovel-review 1-5  # 审查第 1-5 章
+/webnovel-revise 3    # 按修改意见受控修订；事实变化先改大纲
 /webnovel-amend 3     # 修订已提交章节后重新入链
 ```
 
@@ -147,7 +148,7 @@ model: sonnet  # 可选：inherit / sonnet / opus / haiku
 ---
 ```
 
-Codex 中的 `/webnovel-write`、`/webnovel-review`、`/webnovel-amend` 默认使用 `references/codex/agent-protocols.md` 中的单会话 inline protocol；如果当前 Codex 环境显式提供 subagent 能力，也可以按同一 artifact schema 拆分执行。
+Codex 中的 `/webnovel-write`、`/webnovel-review`、`/webnovel-revise`、`/webnovel-amend` 默认使用 `references/codex/agent-protocols.md` 中的单会话 inline protocol；如果当前 Codex 环境显式提供 subagent 能力，也可以按同一 artifact schema 拆分执行。
 
 ## 更新简介
 
