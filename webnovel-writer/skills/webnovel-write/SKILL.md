@@ -149,6 +149,15 @@ blocking=true → 修复后重审，不进 Step 4。`--fast` 只检查 setting/t
 
 只改表达不改事实。`anti_ai_force_check=fail` 时不进 Step 5。`--minimal` 仅排版。
 
+Step 4 完成后必须运行正文门禁：
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" style-gate \
+  --volume {volume_num} --chapter {chapter_in_volume} --format json
+```
+
+`status=fail` 时修正文，重跑 Step 4 和 `style-gate`，不得进入 Step 5。
+
 ### Step 5：提交
 
 #### 5.1 Data Agent 提取事实
@@ -183,6 +192,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 ```
 
 自动判定：blocking_count>0 或 missed_nodes 非空 或 pending 非空 → rejected，否则 accepted。`native_write` 模式缺少目标章合同或 review contract 时会拒绝写入；`repair_backfill` 只允许 story-repair 重建使用。
+`native_write` 还会重新执行正文门禁；门禁未通过时直接拒绝入链。
 
 #### 5.3 验证投影
 
@@ -211,9 +221,10 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" bac
 3. 审查已落库（`--minimal` 除外）
 4. blocking=true 必须停在 Step 3
 5. anti_ai_force_check=pass（`--minimal` 除外）
-6. accepted CHAPTER_COMMIT，projection 五项 done/skipped
-7. chapter_status=committed（projection 自动推进）
+6. `style-gate status=pass`
+7. accepted CHAPTER_COMMIT，projection 五项 done/skipped
+8. chapter_status=committed（projection 自动推进）
 
 ## 失败恢复
 
-审查缺失→重跑 Step 3。摘要/状态/记忆缺失→重跑 Step 5。润色失真→回 Step 4 修复后重跑 Step 5。
+审查缺失→重跑 Step 3。正文门禁失败→回 Step 4 修复。摘要/状态/记忆缺失→重跑 Step 5。润色失真→回 Step 4 修复后重跑 Step 5。

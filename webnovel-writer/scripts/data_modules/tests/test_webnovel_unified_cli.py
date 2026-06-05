@@ -95,6 +95,43 @@ def test_extract_context_forwards_with_resolved_project_root(monkeypatch, tmp_pa
     ]
 
 
+def test_style_gate_cli_blocks_bad_chapter_body(monkeypatch, tmp_path, capsys):
+    module = _load_webnovel_module()
+
+    project_root = tmp_path / "book"
+    (project_root / ".webnovel").mkdir(parents=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+    chapter_dir = project_root / "正文" / "第1卷"
+    chapter_dir.mkdir(parents=True)
+    (chapter_dir / "第007章-测试.md").write_text(
+        "# 第7章：测试\n\n"
+        "这笔钱已经不是第 4 章时那种\"输掉就万劫不复\"的全部身家。\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(sys, "argv", [
+        "webnovel",
+        "--project-root",
+        str(project_root),
+        "style-gate",
+        "--chapter",
+        "7",
+        "--format",
+        "json",
+    ])
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "fail"
+    assert {issue["rule_id"] for issue in payload["issues"]} >= {
+        "meta_chapter_reference",
+        "cliche_label",
+    }
+
+
 def test_backup_forwards_resolved_book_root_from_parent_workspace(monkeypatch, tmp_path):
     module = _load_webnovel_module()
 

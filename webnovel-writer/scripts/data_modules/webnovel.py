@@ -361,6 +361,26 @@ def cmd_prewrite_check(args: argparse.Namespace) -> int:
     return 0 if result.ready else 2
 
 
+def cmd_style_gate(args: argparse.Namespace) -> int:
+    project_root = _resolve_root(args.project_root)
+    chapter = _resolve_global_chapter(project_root, int(args.chapter), int(args.volume or 0))
+
+    from .style_gate import run_style_gate_project
+
+    result = run_style_gate_project(project_root, chapter, require_body=True)
+    if args.format == "json":
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        status = result.get("status")
+        print(f"style-gate: {status} blocking={result.get('blocking_count', 0)}")
+        for issue in result.get("issues", []):
+            print(
+                f"- {issue.get('location')}: {issue.get('rule_id')} "
+                f"{issue.get('evidence')}"
+            )
+    return 0 if result.get("status") == "pass" else 2
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="webnovel unified CLI")
     parser.add_argument("--project-root", help="书项目根目录或工作区根目录（可选，默认自动检测）")
@@ -379,6 +399,12 @@ def main() -> None:
     p_prewrite.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_prewrite.add_argument("--rewrite", action="store_true", help="允许目标章节已有 accepted commit")
     p_prewrite.set_defaults(func=cmd_prewrite_check)
+
+    p_style_gate = sub.add_parser("style-gate", help="扫描正文是否触发硬性文风门禁")
+    p_style_gate.add_argument("--volume", type=int, default=0, help="显式卷号；传入时 --chapter 为卷内章节")
+    p_style_gate.add_argument("--chapter", type=int, required=True, help="目标章节号")
+    p_style_gate.add_argument("--format", choices=["json", "text"], default="json")
+    p_style_gate.set_defaults(func=cmd_style_gate)
 
     p_use = sub.add_parser("use", help="绑定当前工作区使用的书项目（写入指针/registry）")
     p_use.add_argument("project_root", help="书项目根目录（必须包含 .webnovel/state.json）")

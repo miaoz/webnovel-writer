@@ -25,6 +25,7 @@ allowed-tools: Read Grep Write Edit Bash Agent
 - 只做最小必要改动；默认不整章重写。
 - 多章修订必须逐章串行，不并行。
 - blocking review 未解决，不跑 data-agent / chapter-commit。
+- 正文门禁未通过，不跑 reviewer / data-agent / chapter-commit。
 - `repair_backfill` 只用于历史重建；本流程必须用 `native_write`。
 - `.story-system/` 合同树和 `大纲/` 是修订前置真源；`.webnovel/*` 是投影/read-model。
 
@@ -170,6 +171,15 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 ### Step 6：审查当前正文
 
+先运行正文门禁：
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" style-gate \
+  --volume {volume_num} --chapter {chapter_in_volume} --format json
+```
+
+`status=fail` 时回 Step 5 修正文并重跑门禁，不进入 reviewer。
+
 必须调用 `reviewer`，保存结构化 JSON。
 
 #### Claude Code path
@@ -226,6 +236,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 ```
 
 若输出为 rejected，停止并报告 missed_nodes / pending / blocking_count。
+`native_write` 会重新执行正文门禁；门禁未通过时直接拒绝入链。
 
 ### Step 9：验证
 
@@ -256,6 +267,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 - 分类不确定：默认当作事实可能变化处理，先生成提案让用户确认。
 - 用户不同意大纲修订提案：不改正文，结束流程或改走非事实修订范围。
 - review blocking：修正文后回 Step 6。
+- 正文门禁失败：修正文后回 Step 5，再重跑 Step 6。
 - data-agent JSON 格式不合格：只重跑 Step 7。
 - `chapter-commit` rejected：根据 rejected 原因修复正文或 JSON 后回 Step 7。
 - projection failed：只重跑 Step 8，必要时保留错误输出。

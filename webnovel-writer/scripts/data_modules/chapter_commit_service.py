@@ -27,6 +27,7 @@ from .override_ledger_service import (
     ensure_override_ledger_columns,
     persist_amend_proposals,
 )
+from .style_gate import run_style_gate_project
 
 
 class ChapterCommitService:
@@ -67,6 +68,20 @@ class ChapterCommitService:
                 "missing required story contracts for native accepted commit: "
                 + ", ".join(missing_contracts)
             )
+        if status == "accepted" and commit_mode == "native_write":
+            style_gate = run_style_gate_project(
+                self.project_root,
+                chapter,
+                require_body=False,
+            )
+            if int(style_gate.get("blocking_count") or 0) > 0:
+                issues = style_gate.get("issues") or []
+                evidence = "; ".join(
+                    str(issue.get("evidence") or issue.get("description") or "")
+                    for issue in issues[:3]
+                    if isinstance(issue, dict)
+                )
+                raise ValueError(f"style gate failed before native_write commit: {evidence}")
         accepted_events = EventLogStore(self.project_root).normalize_events(
             chapter, extraction.accepted_events
         )

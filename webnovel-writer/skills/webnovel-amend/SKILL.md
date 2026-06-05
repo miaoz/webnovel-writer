@@ -21,6 +21,7 @@ allowed-tools: Read Grep Write Edit Bash Agent AskUserQuestion
 - blocking review 未解决，不跑 data-agent / chapter-commit。
 - `repair_backfill` 只用于历史重建；人工修订必须用 `native_write`。
 - 不直接改 `.webnovel/state.json`、`index.db` 或 summaries，全部由 `chapter-commit` 投影刷新。
+- 正文门禁未通过，不跑 reviewer / data-agent / chapter-commit。
 
 ## 流程
 
@@ -50,7 +51,16 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 
 章节级修订不得传 `--refresh-master`。
 
-### Step 2：审查当前正文
+### Step 2：正文门禁与审查
+
+先运行正文门禁：
+
+```bash
+python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" style-gate \
+  --volume {volume_num} --chapter {chapter_in_volume} --format json
+```
+
+`status=fail` 时先修正文或报告问题，不进入 reviewer。
 
 必须调用 `reviewer`，保存结构化 JSON。
 
@@ -108,6 +118,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" cha
 ```
 
 该步骤会用当前正文的 `body_sha256` 覆盖该章 commit，并重新应用 projections。若输出为 rejected，停止并报告 missed_nodes / pending / blocking_count。
+`native_write` 会重新执行正文门禁；门禁未通过时直接拒绝入链。
 
 ### Step 5：验证
 
@@ -134,6 +145,7 @@ python -X utf8 "${SCRIPTS_DIR}/webnovel.py" --project-root "${PROJECT_ROOT}" \
 ## 失败恢复
 
 - review blocking：修正文后回 Step 2。
+- 正文门禁失败：修正文后回 Step 2。
 - data-agent JSON 格式不合格：只重跑 Step 3。
 - `chapter-commit` rejected：根据 rejected 原因修复正文或 JSON 后回 Step 3。
 - projection failed：只重跑 Step 4，必要时保留错误输出。

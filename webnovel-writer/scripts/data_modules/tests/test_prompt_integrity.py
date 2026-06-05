@@ -31,6 +31,7 @@ ALL_PROMPT_FILES = AGENT_FILES + SKILL_FILES
 # webnovel.py 注册的子命令（从 add_parser 提取）
 REGISTERED_CLI_SUBCOMMANDS = {
     "where", "preflight", "prewrite-check", "use",
+    "style-gate",
     "index", "state", "rag", "style", "entity", "context", "memory",
     "migrate", "status", "update-state", "backup", "archive",
     "init", "extract-context", "memory-contract", "project-memory", "review-pipeline",
@@ -503,6 +504,13 @@ def test_webnovel_revise_enforces_outline_first_for_fact_changes():
     assert "chapter-commit" in text
     assert "--commit-mode native_write" in text
     assert "story-repair audit" in text
+
+
+def test_write_amend_revise_run_style_gate_before_commit():
+    for skill_name in ("webnovel-write", "webnovel-amend", "webnovel-revise"):
+        text = (SKILLS_DIR / skill_name / "SKILL.md").read_text(encoding="utf-8")
+        assert "style-gate" in text, skill_name
+        assert text.index("style-gate \\") < text.index("chapter-commit \\"), skill_name
 
 
 def test_dashboard_and_plan_skills_surface_story_runtime_mainline():

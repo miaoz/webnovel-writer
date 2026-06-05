@@ -22,6 +22,12 @@ def _write_min_contracts(project_root: Path, chapter: int, volume: int = 1) -> N
     (story_root / "volumes" / f"volume_{volume:03d}.json").write_text("{}", encoding="utf-8")
 
 
+def _write_chapter_body(project_root: Path, chapter: int, text: str, volume: int = 1) -> None:
+    chapter_dir = project_root / "正文" / f"第{volume}卷"
+    chapter_dir.mkdir(parents=True, exist_ok=True)
+    (chapter_dir / f"第{chapter:03d}章-测试.md").write_text(text, encoding="utf-8")
+
+
 def test_commit_service_rejects_when_missed_nodes_exist(tmp_path):
     service = ChapterCommitService(tmp_path)
     payload = service.build_commit(
@@ -88,6 +94,34 @@ def test_commit_service_accepts_when_all_checks_pass(tmp_path):
     assert payload["contract_refs"]["volume"] == "volume_001.json"
     assert payload["contract_refs"]["chapter"] == "chapter_003.json"
     assert payload["outline_snapshot"]["covered_nodes"] == ["发现陷阱"]
+
+
+def test_commit_service_blocks_native_commit_when_style_gate_fails(tmp_path):
+    _write_min_contracts(tmp_path, 3)
+    _write_chapter_body(
+        tmp_path,
+        3,
+        "# 第3章：测试\n\n这笔钱已经不是第 1 章时那种\"输掉就万劫不复\"的全部身家。\n",
+    )
+    service = ChapterCommitService(tmp_path)
+
+    with pytest.raises(ValueError, match="style gate"):
+        service.build_commit(
+            chapter=3,
+            review_result={"blocking_count": 0},
+            fulfillment_result={
+                "planned_nodes": ["发现陷阱"],
+                "covered_nodes": ["发现陷阱"],
+                "missed_nodes": [],
+                "extra_nodes": [],
+            },
+            disambiguation_result={"pending": []},
+            extraction_result={
+                "state_deltas": [],
+                "entity_deltas": [],
+                "accepted_events": [],
+            },
+        )
 
 
 def test_commit_service_includes_volume_ref_and_write_fact_provenance(tmp_path):

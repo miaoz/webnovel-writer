@@ -189,6 +189,55 @@ purpose: 章节生成后的润色阶段加载，基于审查报告修复问题 +
 - 禁止连续使用”更重要的是””更令人惊讶的是””最让他在意的是”递进模板。
 - 禁止“不是X，而是Y”“不是X，是Y”“不是因为X，而是因为Y”“不是什么A，就是B”这类连续否定揭示句。若必须表达对比，改成具体动作、结果或代价，让读者自己得到判断。
 
+#### 机器门禁规则
+
+<!-- STYLE_GATE_RULES:BEGIN -->
+```json
+{
+  "schema_version": "style-gate-rules/v1",
+  "rules": {
+    "dash": {
+      "type": "regex",
+      "pattern": "[—–]",
+      "severity": "critical",
+      "category": "ai_flavor",
+      "blocking": true,
+      "description": "正文出现破折号或长横线。",
+      "fix_hint": "拆句，改用句号、逗号、冒号、分号、括号、换行或动作断句。"
+    },
+    "meta_chapter_reference": {
+      "type": "regex",
+      "pattern": "第\\s*[0-9]+\\s*章",
+      "skip_chapter_heading": true,
+      "severity": "critical",
+      "category": "ai_flavor",
+      "blocking": true,
+      "description": "正文出现章节编号式元叙事。",
+      "fix_hint": "改成角色当下记忆、资产状态或具体场景，不要引用第几章。"
+    },
+    "negation_contrast": {
+      "type": "regex",
+      "pattern": "(?<!是)不是[^。！？\\n]{0,40}(，|,)?(而是|是|就是|而在于)|不是什么[^。！？\\n]{0,40}(，|,)?就是",
+      "severity": "critical",
+      "category": "ai_flavor",
+      "blocking": true,
+      "description": "正文出现连续否定揭示句。",
+      "fix_hint": "改成具体动作、结果或代价，让读者自己判断对比关系。"
+    },
+    "cliche_label": {
+      "type": "literal_any",
+      "phrases": ["万劫不复", "五味杂陈", "命运的齿轮", "空气仿佛凝固", "时间仿佛静止"],
+      "severity": "critical",
+      "category": "ai_flavor",
+      "blocking": true,
+      "description": "正文出现高风险标签化套语。",
+      "fix_hint": "改成具体压力、动作、身体反应或现实后果。"
+    }
+  }
+}
+```
+<!-- STYLE_GATE_RULES:END -->
+
 ### 第3层：形容词、副词与比喻限制
 
 - 连续两个以上形容词修饰同一名词，默认重写。
